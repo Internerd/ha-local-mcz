@@ -39,19 +39,26 @@ STEP_USER_SCHEMA = vol.Schema(
 )
 
 
-async def _async_validate(hass: HomeAssistant, host: str, port: int) -> str | None:
-    """Return an error key, or None if the stove answered."""
+async def _async_validate(
+    hass: HomeAssistant, host: str, port: int
+) -> tuple[str | None, str]:
+    """Connect once; return (error key, unique id).
+
+    The unique id is the module serial, or host:port if the stove did not
+    report one.
+    """
     client = MczClient(async_get_clientsession(hass), host, port)
     try:
         await client.connect()
     except MczConnectionError:
-        return "cannot_connect"
+        return "cannot_connect", ""
     except Exception:
         _LOGGER.exception("Unexpected error while connecting")
-        return "unknown"
+        return "unknown", ""
     finally:
         await client.close()
-    return None
+    serial = client.versions.serial if client.versions else None
+    return None, serial or f"{host}:{port}"
 
 
 def _clean(user_input: dict[str, Any]) -> dict[str, Any]:
@@ -70,9 +77,11 @@ class MczConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
         if user_input is not None:
             data = _clean(user_input)
-            await self.async_set_unique_id(f"{data[CONF_HOST]}:{data[CONF_PORT]}")
-            self._abort_if_unique_id_configured()
-            if not (error := await _async_validate(self.hass, **data)):
+            self._async_abort_entries_match(data)
+            error, unique_id = await _async_validate(self.hass, **data)
+            if error is None:
+                await self.async_set_unique_id(unique_id)
+                self._abort_if_unique_id_configured(updates=data)
                 return self.async_create_entry(title=DEFAULT_TITLE, data=data)
             errors["base"] = error
 
@@ -92,12 +101,15 @@ class MczConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
         if user_input is not None:
             data = _clean(user_input)
-            await self.async_set_unique_id(f"{data[CONF_HOST]}:{data[CONF_PORT]}")
-            if self.unique_id != entry.unique_id:
-                self._abort_if_unique_id_configured()
-            if not (error := await _async_validate(self.hass, **data)):
+            error, unique_id = await _async_validate(self.hass, **data)
+            if error is None:
+                await self.async_set_unique_id(unique_id)
+                if unique_id != entry.unique_id:
+                    # A different stove (or one without serial) must not
+                    # replace an entry that is already configured.
+                    self._abort_if_unique_id_configured()
                 return self.async_update_reload_and_abort(
-                    entry, unique_id=self.unique_id, data_updates=data
+                    entry, unique_id=unique_id, data_updates=data
                 )
             errors["base"] = error
 

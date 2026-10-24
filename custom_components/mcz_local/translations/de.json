@@ -58,14 +58,14 @@
       },
       "igniter": {
         "name": "Zündkerze"
-      },
-      "eco_stop": {
-        "name": "Eco-Stop"
       }
     },
     "button": {
       "alarm_reset": {
         "name": "Alarm zurücksetzen"
+      },
+      "sync_clock": {
+        "name": "Ofenuhr stellen"
       }
     },
     "climate": {
@@ -76,6 +76,18 @@
     "number": {
       "power_level": {
         "name": "Leistungsstufe"
+      },
+      "water_setpoint": {
+        "name": "Wasser-Sollwert"
+      },
+      "buffer_setpoint": {
+        "name": "Puffer-Sollwert"
+      },
+      "tank_setpoint": {
+        "name": "Boiler-Sollwert"
+      },
+      "dhw_setpoint": {
+        "name": "Warmwasser-Sollwert"
       }
     },
     "select": {
@@ -114,6 +126,42 @@
           "5": "5",
           "auto": "Auto"
         }
+      },
+      "adaptive_mode": {
+        "name": "Adaptiver Modus",
+        "state": {
+          "manual": "Manuell",
+          "dynamic": "Dynamisch",
+          "overnight": "Nacht",
+          "comfort": "Komfort",
+          "power": "Power"
+        }
+      }
+    },
+    "switch": {
+      "auto_mode": {
+        "name": "Auto-Modus"
+      },
+      "eco_stop": {
+        "name": "Eco-Stop"
+      },
+      "silent_mode": {
+        "name": "Silent-Modus"
+      },
+      "chrono": {
+        "name": "Chrono (Zeitplan)"
+      },
+      "summer_mode": {
+        "name": "Sommerbetrieb"
+      },
+      "antifreeze": {
+        "name": "Frostschutz"
+      },
+      "pellet_sensor": {
+        "name": "Pelletsensor"
+      },
+      "sound": {
+        "name": "Töne"
       }
     },
     "sensor": {
@@ -204,23 +252,6 @@
       "hours_to_service": {
         "name": "Stunden bis Wartung"
       },
-      "control_mode": {
-        "name": "Betriebsart",
-        "state": {
-          "power": "Leistung",
-          "temperature": "Temperatur"
-        }
-      },
-      "adaptive_mode": {
-        "name": "Adaptiver Modus",
-        "state": {
-          "manual": "Manuell",
-          "dynamic": "Dynamisch",
-          "overnight": "Nacht",
-          "comfort": "Komfort",
-          "power": "Power"
-        }
-      },
       "active_value": {
         "name": "Active-Wert"
       },
@@ -248,17 +279,98 @@
       "return_temperature": {
         "name": "Rücklauftemperatur"
       },
-      "water_target": {
-        "name": "Wasser-Solltemperatur"
+      "operating_hours": {
+        "name": "Betriebsstunden"
       },
-      "buffer_target": {
-        "name": "Puffer-Solltemperatur"
+      "ignitions": {
+        "name": "Zündungen"
       },
-      "tank_target": {
-        "name": "Boiler-Solltemperatur"
+      "minutes_to_shutdown": {
+        "name": "Minuten bis Abschaltung"
       },
-      "dhw_target": {
-        "name": "Warmwasser-Solltemperatur"
+      "last_alarm": {
+        "name": "Letzter Alarm",
+        "state": {
+          "off": "Aus",
+          "check": "Prüfung",
+          "cleaning_cold": "Reinigung (kalt)",
+          "loading_cold": "Pelletbeladung (kalt)",
+          "start_1_cold": "Start 1 (kalt)",
+          "start_2_cold": "Start 2 (kalt)",
+          "cleaning_warm": "Reinigung (warm)",
+          "loading_warm": "Pelletbeladung (warm)",
+          "start_1_warm": "Start 1 (warm)",
+          "start_2_warm": "Start 2 (warm)",
+          "stabilization": "Stabilisierung",
+          "power_1": "Leistung 1",
+          "power_2": "Leistung 2",
+          "power_3": "Leistung 3",
+          "power_4": "Leistung 4",
+          "power_5": "Leistung 5",
+          "power_6": "Leistung 6",
+          "power_7": "Leistung 7",
+          "power_8": "Leistung 8",
+          "power_9": "Leistung 9",
+          "power_10": "Leistung 10",
+          "power_11": "Leistung 11",
+          "power_12": "Leistung 12",
+          "power_13": "Leistung 13",
+          "power_14": "Leistung 14",
+          "power_15": "Leistung 15",
+          "power_16": "Leistung 16",
+          "power_17": "Leistung 17",
+          "power_18": "Leistung 18",
+          "power_19": "Leistung 19",
+          "power_20": "Leistung 20",
+          "shutdown": "Herunterfahren",
+          "cooling": "Abkühlen",
+          "cleaning_low": "Reinigung (niedrig)",
+          "cleaning_high": "Reinigung (hoch)",
+          "auger_unlock": "Schnecke freigeben",
+          "auto_eco": "Auto-Eco",
+          "standby": "Standby",
+          "diagnostics": "Diagnose",
+          "auger_loading": "Schnecke befüllen",
+          "alarm_a01": "A01 – Keine Zündung",
+          "alarm_a02": "A02 – Keine Flamme",
+          "alarm_a03": "A03 – Pellet-Sicherheit",
+          "alarm_a04": "A04 – Abgastemperatur",
+          "alarm_a05": "A05 – Verstopfung",
+          "alarm_a08": "A08 – Abgasgebläse",
+          "alarm_a09": "A09 – Abgasfühler",
+          "alarm_a11": "A11 – Getriebemotor",
+          "alarm_a13": "A13 – Platinentemperatur",
+          "alarm_a14": "A14 – Active-Sensor defekt",
+          "alarm_a18": "A18 – Wasser-Thermostat",
+          "alarm_a19": "A19 – Wasserfühler defekt",
+          "alarm_a20": "A20 – Hilfsfühler defekt",
+          "alarm_a21": "A21 – Druckwächter",
+          "alarm_a22": "A22 – Raumfühler defekt",
+          "alarm_a23": "A23 – Brennschale schließt nicht",
+          "waiting_safety_alarm": "Warte auf Sicherheitsalarme",
+          "waiting_recipe_db": "Warte auf Rezept-Datenbank",
+          "waiting_serial": "Warte auf Seriennummer",
+          "alarm_unknown": "Unbekannter Alarm",
+          "unknown": "Unbekannt"
+        }
+      },
+      "last_alarm_time": {
+        "name": "Zeitpunkt letzter Alarm"
+      },
+      "operating_hours_power_1": {
+        "name": "Betriebsstunden Leistung 1"
+      },
+      "operating_hours_power_2": {
+        "name": "Betriebsstunden Leistung 2"
+      },
+      "operating_hours_power_3": {
+        "name": "Betriebsstunden Leistung 3"
+      },
+      "operating_hours_power_4": {
+        "name": "Betriebsstunden Leistung 4"
+      },
+      "operating_hours_power_5": {
+        "name": "Betriebsstunden Leistung 5"
       },
       "pump_pwm": {
         "name": "Pumpe"

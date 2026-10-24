@@ -105,3 +105,47 @@ def test_ipv6_url() -> None:
 
     client = MczClient(None, "fe80::1", 81)  # type: ignore[arg-type]
     assert str(client._url) == "ws://[fe80::1]:81/"
+
+
+def test_parse_versions() -> None:
+    """Serial, MAC, panel type and firmware come from the 0E frame."""
+    from .fake_stove import VERSIONS_FRAME
+
+    versions = p.parse_versions(VERSIONS_FRAME)
+    assert versions.serial == "MCZ-0000TEST0001"
+    assert versions.mac == "0a:1b:2c:3d:4e:5f"
+    assert versions.panel_type == "TE06"
+    assert versions.panel_firmware == (1, 11, 1)
+    assert p.parse_versions("x").serial is None
+
+
+def test_parse_alarms() -> None:
+    """Empty slots are skipped and entries sorted newest first."""
+    from .fake_stove import ALARMS_FRAME
+
+    alarms = p.parse_alarms(ALARMS_FRAME)
+    assert [a.state for a in alarms] == [51, 50, 50]
+    assert alarms[0].time.isoformat() == "2026-03-13T04:24:34+00:00"
+    assert p.parse_alarms("") == []
+
+
+def test_set_datetime() -> None:
+    """SalvaDataOra uses DDMMYYYYHHMM."""
+    from datetime import datetime
+
+    assert p.set_datetime(datetime(2026, 10, 24, 12, 29)) == (
+        "C|SalvaDataOra|241020261229"
+    )
+
+
+def test_adaptive_mode_value() -> None:
+    """Profiles are written with +10."""
+    assert p.adaptive_mode_value("manual") == 10
+    assert p.adaptive_mode_value("power") == 14
+
+
+def test_limits() -> None:
+    """Limits are whole °C; implausible ranges are rejected."""
+    params = p.parse_parameters(params_frame())
+    assert params.limits(p.PARAMS_ROOM_MIN, p.PARAMS_ROOM_MAX) == (5, 35)
+    assert params.limits(p.PARAMS_BUFFER_MIN, p.PARAMS_BUFFER_MAX) is None

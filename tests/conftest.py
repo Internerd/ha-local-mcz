@@ -36,6 +36,12 @@ def config_entry(fake_stove: tuple[FakeStove, int]) -> MockConfigEntry:
     return MockConfigEntry(
         domain=DOMAIN,
         title="MCZ Maestro",
-        unique_id=f"127.0.0.1:{port}",
+        unique_id="MCZ-0000TEST0001",
         data={"host": "127.0.0.1", "port": port},
     )
+
+
+@pytest.fixture
+def short_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Make unanswered optional requests time out quickly."""
+    monkeypatch.setattr("custom_components.mcz_local.client.RESPONSE_TIMEOUT", 0.2)

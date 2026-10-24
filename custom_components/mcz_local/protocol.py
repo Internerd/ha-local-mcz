@@ -14,15 +14,20 @@ Conventions of the protocol:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 
 # --- Incoming frame codes ---------------------------------------------------
 CODE_PING = "PING"
 CODE_PARAMETERS = "00"
 CODE_INFO = "01"
+CODE_ALARMS = "0A"
+CODE_VERSIONS = "0E"
 
 # --- Outgoing commands ------------------------------------------------------
 CMD_GET_PARAMETERS = "C|RecuperoParametri"
 CMD_GET_INFO = "C|RecuperoInfo"
+CMD_GET_ALARMS = "C|RecuperaAllarmi"
+CMD_GET_VERSIONS = "C|RecuperoVersioneSW"
 CMD_PONG = "P|PONG"
 
 # --- WriteParametri ids -----------------------------------------------------
@@ -32,7 +37,20 @@ PARAM_POWER_LEVEL = 36
 PARAM_FAN_FRONT = 37
 PARAM_FAN_DUCT_1 = 38
 PARAM_FAN_DUCT_2 = 39
+PARAM_AUTO_MODE = 40
+PARAM_ECO_STOP = 41
 PARAM_TARGET_TEMPERATURE = 42
+PARAM_SILENT_MODE = 45
+PARAM_SOUND = 50
+PARAM_WATER_TARGET = 51
+PARAM_BUFFER_TARGET = 52
+PARAM_TANK_TARGET = 53
+PARAM_DHW_TARGET = 54
+PARAM_SUMMER_MODE = 58
+PARAM_PELLET_SENSOR = 148
+PARAM_ADAPTIVE_MODE = 149
+PARAM_ANTIFREEZE = 154
+PARAM_CHRONO = 1111
 
 VALUE_POWER_ON = 1
 VALUE_POWER_OFF = 40
@@ -66,14 +84,23 @@ INFO_ADAPTIVE_MODE = 17
 INFO_ACTIVE_VALUE = 20
 INFO_CONTROL_MODE = 21
 INFO_ECO_STOP = 22
+INFO_SILENT_MODE = 23
+INFO_CHRONO = 24
 INFO_ROOM_TARGET = 25
 INFO_WATER_TARGET = 26
 INFO_BOARD_TEMP = 27
 INFO_POWER_LEVEL = 28
 INFO_FIRMWARE = 29
+INFO_HOURS_TOTAL = 36
+INFO_HOURS_POWER_1 = 37  # 37..41 = power level 1..5
 INFO_HOURS_TO_SERVICE = 42
+INFO_MINUTES_TO_SHUTDOWN = 43
+INFO_IGNITIONS = 44
 INFO_ACTIVE_TEMP = 45
+INFO_PELLET_SENSOR = 46
 INFO_UNIT = 47
+INFO_SOUND = 48
+INFO_SUMMER_MODE = 50
 INFO_WIFI_PROBE_1 = 51
 INFO_WIFI_PROBE_2 = 52
 INFO_WIFI_PROBE_3 = 53
@@ -81,9 +108,21 @@ INFO_BUFFER_TARGET = 55
 INFO_TANK_TARGET = 56
 INFO_DHW_TARGET = 57
 INFO_RETURN_TEMP = 58
+INFO_ANTIFREEZE = 59
 
 # --- RecuperoParametri (code 00) byte indices ------------------------------
 PARAMS_MODEL = 1
+# Setpoint limits, in whole °C (not * 2).
+PARAMS_ROOM_MIN = 2
+PARAMS_ROOM_MAX = 3
+PARAMS_WATER_MIN = 4
+PARAMS_WATER_MAX = 5
+PARAMS_BUFFER_MIN = 33
+PARAMS_BUFFER_MAX = 34
+PARAMS_TANK_MIN = 35
+PARAMS_TANK_MAX = 36
+PARAMS_DHW_MIN = 37
+PARAMS_DHW_MAX = 38
 PARAMS_FAN_FRONT_PRESENT = 8
 PARAMS_FAN_DUCT_1_PRESENT = 14
 PARAMS_FAN_DUCT_2_PRESENT = 20
@@ -156,8 +195,20 @@ STATE_OPTIONS: list[str] = [
 ]
 
 ADAPTIVE_MODE_KEYS = ["manual", "dynamic", "overnight", "comfort", "power"]
-CONTROL_MODE_KEYS = ["power", "temperature"]
+# Written to WriteParametri|149 on stoves with adaptive mode available.
+ADAPTIVE_MODE_OFFSET = 10
 THREE_WAY_VALVE_KEYS = ["heating", "sanitary"]
+
+
+def _firmware(value: str | None) -> tuple[int, int, int] | None:
+    """Decode a 3-byte hex version such as ``010b01`` into (1, 11, 1)."""
+    if value is None or len(value) > 6:
+        return None
+    value = value.zfill(6)
+    try:
+        return (int(value[0:2], 16), int(value[2:4], 16), int(value[4:6], 16))
+    except ValueError:
+        return None
 
 
 class ProtocolError(Exception):
@@ -186,6 +237,13 @@ class StoveParameters:
     def adaptive_available(self) -> bool:
         """Return True if the adaptive (profile) modes are available."""
         return self.get(PARAMS_ADAPTIVE_AVAILABLE) == 1
+
+    def limits(self, min_index: int, max_index: int) -> tuple[int, int] | None:
+        """Return a (min, max) °C setpoint range, None if not plausible."""
+        low, high = self.get(min_index), self.get(max_index)
+        if low is None or high is None or not 0 < low < high < 100:
+            return None
+        return low, high
 
     def fan_present(self, presence_index: int) -> bool:
         """Return True if the fan behind ``presence_index`` is installed."""
@@ -223,6 +281,13 @@ class StoveInfo:
             return None
         return value / 2
 
+    def hours(self, index: int) -> float | None:
+        """Return an operating-time field (seconds) in hours."""
+        value = self.get(index)
+        if value is None:
+            return None
+        return round(value / 3600, 1)
+
     @property
     def state(self) -> int | None:
         """Return the raw stove state code."""
@@ -239,14 +304,89 @@ class StoveInfo:
     @property
     def firmware(self) -> tuple[int, int, int] | None:
         """Return the board firmware as (major, minor, patch)."""
-        value = self.raw_field(INFO_FIRMWARE)
-        if value is None or len(value) > 6:
+        return _firmware(self.raw_field(INFO_FIRMWARE))
+
+
+@dataclass
+class StoveVersions:
+    """Version block (``0E`` frame)."""
+
+    raw: str
+    fields: list[str] = field(default_factory=list)
+
+    def _field(self, index: int) -> str | None:
+        if 0 <= index < len(self.fields) and self.fields[index] not in ("", "N.C."):
+            return self.fields[index]
+        return None
+
+    @property
+    def panel_firmware(self) -> tuple[int, int, int] | None:
+        """Return the control panel firmware."""
+        return _firmware(self._field(1))
+
+    @property
+    def panel_type(self) -> str | None:
+        """Return the panel type, e.g. ``TE06``."""
+        value = self._field(2)
+        if value is None:
             return None
-        value = value.zfill(6)
         try:
-            return (int(value[0:2], 16), int(value[2:4], 16), int(value[4:6], 16))
+            return bytes.fromhex(value).decode("ascii").strip() or None
+        except (ValueError, UnicodeDecodeError):
+            return None
+
+    @property
+    def serial(self) -> str | None:
+        """Return the Wi-Fi module id / serial, e.g. ``MCZ-014A55196D5197``."""
+        return self._field(4)
+
+    @property
+    def mac(self) -> str | None:
+        """Return the module MAC address as ``aa:bb:cc:dd:ee:ff``."""
+        value = self._field(7)
+        if value is None or len(value) != 12:
+            return None
+        try:
+            int(value, 16)
         except ValueError:
             return None
+        return ":".join(value[i : i + 2] for i in range(0, 12, 2)).lower()
+
+
+@dataclass(frozen=True)
+class AlarmEntry:
+    """One slot of the alarm history (``0A`` frame)."""
+
+    state: int
+    time: datetime
+
+
+def parse_versions(data: str) -> StoveVersions:
+    """Parse the payload of a ``0E`` frame."""
+    data = data.strip()
+    return StoveVersions(raw=data, fields=data.split("|"))
+
+
+def parse_alarms(data: str) -> list[AlarmEntry]:
+    """Parse ``<state>|<unix time>`` pairs, newest first; empty slots are skipped."""
+    fields = data.strip().split("|")
+    entries: list[AlarmEntry] = []
+    for state, stamp in zip(fields[0::2], fields[1::2], strict=False):
+        if stamp.lower() == "ffffffff":
+            continue
+        try:
+            entries.append(
+                AlarmEntry(int(state, 16), datetime.fromtimestamp(int(stamp, 16), UTC))
+            )
+        except (ValueError, OverflowError, OSError):
+            continue
+    # The stove keeps a ring buffer, so slot order is not chronological.
+    return sorted(entries, key=lambda entry: entry.time, reverse=True)
+
+
+def set_datetime(value: datetime) -> str:
+    """Build the ``SalvaDataOra`` command (``DDMMYYYYHHMM``)."""
+    return f"C|SalvaDataOra|{value:%d%m%Y%H%M}"
 
 
 def split_frame(frame: str) -> tuple[str, str]:
@@ -324,6 +464,11 @@ def is_heating(state: int | None) -> bool:
             STATE_COOLING,
         )
     )
+
+
+def adaptive_mode_value(key: str) -> int:
+    """Return the WriteParametri|149 value for a profile key."""
+    return ADAPTIVE_MODE_KEYS.index(key) + ADAPTIVE_MODE_OFFSET
 
 
 def adaptive_mode_key(value: int | None) -> str | None:

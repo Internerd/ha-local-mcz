@@ -58,14 +58,14 @@
       },
       "igniter": {
         "name": "Igniter"
-      },
-      "eco_stop": {
-        "name": "Eco stop"
       }
     },
     "button": {
       "alarm_reset": {
         "name": "Reset alarm"
+      },
+      "sync_clock": {
+        "name": "Set stove clock"
       }
     },
     "climate": {
@@ -76,6 +76,18 @@
     "number": {
       "power_level": {
         "name": "Power level"
+      },
+      "water_setpoint": {
+        "name": "Water setpoint"
+      },
+      "buffer_setpoint": {
+        "name": "Buffer tank setpoint"
+      },
+      "tank_setpoint": {
+        "name": "Hot water tank setpoint"
+      },
+      "dhw_setpoint": {
+        "name": "Domestic hot water setpoint"
       }
     },
     "select": {
@@ -114,6 +126,42 @@
           "5": "5",
           "auto": "Auto"
         }
+      },
+      "adaptive_mode": {
+        "name": "Adaptive mode",
+        "state": {
+          "manual": "Manual",
+          "dynamic": "Dynamic",
+          "overnight": "Overnight",
+          "comfort": "Comfort",
+          "power": "Power"
+        }
+      }
+    },
+    "switch": {
+      "auto_mode": {
+        "name": "Auto mode"
+      },
+      "eco_stop": {
+        "name": "Eco stop"
+      },
+      "silent_mode": {
+        "name": "Silent mode"
+      },
+      "chrono": {
+        "name": "Chrono (schedule)"
+      },
+      "summer_mode": {
+        "name": "Summer mode"
+      },
+      "antifreeze": {
+        "name": "Antifreeze"
+      },
+      "pellet_sensor": {
+        "name": "Pellet sensor"
+      },
+      "sound": {
+        "name": "Sounds"
       }
     },
     "sensor": {
@@ -204,23 +252,6 @@
       "hours_to_service": {
         "name": "Hours until service"
       },
-      "control_mode": {
-        "name": "Control mode",
-        "state": {
-          "power": "Power",
-          "temperature": "Temperature"
-        }
-      },
-      "adaptive_mode": {
-        "name": "Adaptive mode",
-        "state": {
-          "manual": "Manual",
-          "dynamic": "Dynamic",
-          "overnight": "Overnight",
-          "comfort": "Comfort",
-          "power": "Power"
-        }
-      },
       "active_value": {
         "name": "Active value"
       },
@@ -248,17 +279,98 @@
       "return_temperature": {
         "name": "Return temperature"
       },
-      "water_target": {
-        "name": "Water target temperature"
+      "operating_hours": {
+        "name": "Operating hours"
       },
-      "buffer_target": {
-        "name": "Buffer tank target temperature"
+      "ignitions": {
+        "name": "Ignitions"
       },
-      "tank_target": {
-        "name": "Hot water tank target temperature"
+      "minutes_to_shutdown": {
+        "name": "Minutes until shutdown"
       },
-      "dhw_target": {
-        "name": "Domestic hot water target temperature"
+      "last_alarm": {
+        "name": "Last alarm",
+        "state": {
+          "off": "Off",
+          "check": "Checking",
+          "cleaning_cold": "Cleaning (cold)",
+          "loading_cold": "Loading pellets (cold)",
+          "start_1_cold": "Start 1 (cold)",
+          "start_2_cold": "Start 2 (cold)",
+          "cleaning_warm": "Cleaning (warm)",
+          "loading_warm": "Loading pellets (warm)",
+          "start_1_warm": "Start 1 (warm)",
+          "start_2_warm": "Start 2 (warm)",
+          "stabilization": "Stabilizing",
+          "power_1": "Power 1",
+          "power_2": "Power 2",
+          "power_3": "Power 3",
+          "power_4": "Power 4",
+          "power_5": "Power 5",
+          "power_6": "Power 6",
+          "power_7": "Power 7",
+          "power_8": "Power 8",
+          "power_9": "Power 9",
+          "power_10": "Power 10",
+          "power_11": "Power 11",
+          "power_12": "Power 12",
+          "power_13": "Power 13",
+          "power_14": "Power 14",
+          "power_15": "Power 15",
+          "power_16": "Power 16",
+          "power_17": "Power 17",
+          "power_18": "Power 18",
+          "power_19": "Power 19",
+          "power_20": "Power 20",
+          "shutdown": "Shutting down",
+          "cooling": "Cooling down",
+          "cleaning_low": "Cleaning (low)",
+          "cleaning_high": "Cleaning (high)",
+          "auger_unlock": "Unblocking auger",
+          "auto_eco": "Auto eco",
+          "standby": "Standby",
+          "diagnostics": "Diagnostics",
+          "auger_loading": "Loading auger",
+          "alarm_a01": "A01 – Ignition failed",
+          "alarm_a02": "A02 – No flame",
+          "alarm_a03": "A03 – Pellet safety",
+          "alarm_a04": "A04 – Exhaust temperature",
+          "alarm_a05": "A05 – Obstruction",
+          "alarm_a08": "A08 – Exhaust fan",
+          "alarm_a09": "A09 – Exhaust probe",
+          "alarm_a11": "A11 – Gear motor",
+          "alarm_a13": "A13 – Board temperature",
+          "alarm_a14": "A14 – Active sensor faulty",
+          "alarm_a18": "A18 – Water thermostat",
+          "alarm_a19": "A19 – Water probe faulty",
+          "alarm_a20": "A20 – Auxiliary probe faulty",
+          "alarm_a21": "A21 – Pressure switch",
+          "alarm_a22": "A22 – Room probe faulty",
+          "alarm_a23": "A23 – Brazier does not close",
+          "waiting_safety_alarm": "Waiting for safety alarms",
+          "waiting_recipe_db": "Waiting for recipe database",
+          "waiting_serial": "Waiting for serial number",
+          "alarm_unknown": "Unknown alarm",
+          "unknown": "Unknown"
+        }
+      },
+      "last_alarm_time": {
+        "name": "Last alarm time"
+      },
+      "operating_hours_power_1": {
+        "name": "Operating hours power 1"
+      },
+      "operating_hours_power_2": {
+        "name": "Operating hours power 2"
+      },
+      "operating_hours_power_3": {
+        "name": "Operating hours power 3"
+      },
+      "operating_hours_power_4": {
+        "name": "Operating hours power 4"
+      },
+      "operating_hours_power_5": {
+        "name": "Operating hours power 5"
       },
       "pump_pwm": {
         "name": "Pump"

@@ -26,6 +26,7 @@ async def test_user_flow(
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["data"] == {"host": "127.0.0.1", "port": port}
+    assert result["result"].unique_id == "MCZ-0000TEST0001"
 
 
 async def test_user_flow_cannot_connect(hass: HomeAssistant, socket_enabled) -> None:
@@ -95,4 +96,42 @@ async def test_reconfigure(
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "reconfigure_successful"
     assert entry.data == {"host": "127.0.0.1", "port": port}
-    assert entry.unique_id == f"127.0.0.1:{port}"
+    assert entry.unique_id == "MCZ-0000TEST0001"
+
+
+async def test_user_flow_same_stove_new_ip(
+    hass: HomeAssistant, fake_stove: tuple[FakeStove, int]
+) -> None:
+    """Adding a known stove under a new address updates the existing entry."""
+    _, port = fake_stove
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="MCZ-0000TEST0001",
+        data={"host": "10.0.0.99", "port": port},
+    )
+    entry.add_to_hass(hass)
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"host": "127.0.0.1", "port": port}
+    )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
+    assert entry.data["host"] == "127.0.0.1"
+
+
+async def test_user_flow_without_serial(
+    hass: HomeAssistant, fake_stove: tuple[FakeStove, int], short_timeout: None
+) -> None:
+    """Without a 0E answer the entry falls back to host:port."""
+    stove, port = fake_stove
+    stove.versions = None
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"host": "127.0.0.1", "port": port}
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["result"].unique_id == f"127.0.0.1:{port}"

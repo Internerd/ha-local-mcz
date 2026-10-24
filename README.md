@@ -14,17 +14,25 @@ your LAN. It needs no cloud account and no internet connection.
 
 | Entity | Function |
 |--------|----------|
-| Climate | Switch the stove on and off, set the room temperature (0.5 °C steps on board firmware ≥ 1.9.0), shows the current room temperature and what the stove is doing (heating / idle / off) |
-| Number | Power level 1–5 |
-| Select | Front fan and ducted fans 1/2 (off, 1–5, auto). Only created for fans your stove reports as installed |
-| Button | Reset an alarm |
-| Sensor | Stove state (including alarm codes A01–A23), room / exhaust / board temperature, exhaust fan and auger speed, hours until service, control mode, adaptive mode, wireless probes 1–3 (disabled by default) |
-| Binary sensor | Alarm, brazier needs cleaning, igniter, eco stop |
-| Hydro models | Buffer, water, hot water tank and return temperatures, water setpoints, pump, 3-way valve (read-only for now) |
+| Climate | Switch the stove on and off, set the room temperature within the limits reported by the stove (0.5 °C steps on board firmware ≥ 1.9.0), current room temperature, what the stove is doing (heating / idle / off) |
+| Number | Power level 1–5; on Hydro models the water, buffer, hot water tank and domestic hot water setpoints |
+| Select | Front fan and ducted fans 1/2 (off, 1–5, auto), only for fans the stove reports as installed; adaptive mode (manual, dynamic, overnight, comfort, power), if the stove supports it |
+| Switch | Auto mode, eco stop, silent mode, chrono (schedule) on/off, summer mode, antifreeze, pellet sensor, sounds |
+| Button | Reset an alarm, set the stove clock to Home Assistant's time |
+| Sensor | Stove state (including alarm codes), last alarm and when it happened, room / exhaust / board temperature, exhaust fan and auger speed, operating hours (total and per power level), ignitions, minutes until shutdown, hours until service, wireless probes 1–3 (disabled by default) |
+| Binary sensor | Alarm, brazier needs cleaning, igniter |
+| Hydro models | Buffer, water, hot water tank and return temperatures, pump, 3-way valve |
+
+The device page shows the serial number, MAC address and firmware of the stove.
+
+> Hydro support is built from the protocol documentation and has **not** been
+> tested on a real Hydro stove yet. Feedback is welcome.
+
+Not supported yet: editing the chrono schedule, sleep timer, Active set.
 
 The integration also supports Home Assistant **diagnostics**. A diagnostics
-download contains the raw frames from the stove, which helps when you report a
-problem.
+download contains the raw frames from the stove (serial number and MAC address
+are removed), which helps when you report a problem.
 
 ## Requirements
 

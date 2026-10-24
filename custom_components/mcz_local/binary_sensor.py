@@ -16,7 +16,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .coordinator import MczConfigEntry, MczCoordinator, StoveData
 from .entity import MczEntity
-from .protocol import INFO_BRAZIER, INFO_ECO_STOP, INFO_IGNITER, is_alarm
+from .protocol import INFO_BRAZIER, INFO_IGNITER, is_alarm
 
 PARALLEL_UPDATES = 0
 
@@ -57,11 +57,6 @@ BINARY_SENSORS: tuple[MczBinarySensorDescription, ...] = (
         device_class=BinarySensorDeviceClass.HEAT,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=_flag(INFO_IGNITER),
-    ),
-    MczBinarySensorDescription(
-        key="eco_stop",
-        translation_key="eco_stop",
-        value_fn=_flag(INFO_ECO_STOP),
     ),
 )
 

@@ -1,4 +1,4 @@
-"""Fan selects for the MCZ Maestro (local) integration."""
+"""Selects (fans, adaptive mode) for the MCZ Maestro (local) integration."""
 
 from __future__ import annotations
 
@@ -11,17 +11,23 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from .coordinator import MczConfigEntry, MczCoordinator
 from .entity import MczEntity
 from .protocol import (
+    ADAPTIVE_MODE_KEYS,
     FAN_AUTO,
     FAN_OFF,
+    INFO_ADAPTIVE_MODE,
     INFO_FAN_DUCT_1,
     INFO_FAN_DUCT_2,
     INFO_FAN_FRONT,
+    PARAM_ADAPTIVE_MODE,
+    PARAM_AUTO_MODE,
     PARAM_FAN_DUCT_1,
     PARAM_FAN_DUCT_2,
     PARAM_FAN_FRONT,
     PARAMS_FAN_DUCT_1_PRESENT,
     PARAMS_FAN_DUCT_2_PRESENT,
     PARAMS_FAN_FRONT_PRESENT,
+    adaptive_mode_key,
+    adaptive_mode_value,
 )
 
 PARALLEL_UPDATES = 1
@@ -77,14 +83,17 @@ async def async_setup_entry(
     entry: MczConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Set up fan selects for the fans the stove reports as installed."""
+    """Set up selects for the installed fans and the adaptive mode."""
     coordinator = entry.runtime_data
     params = coordinator.data.parameters
-    async_add_entities(
+    entities: list[SelectEntity] = [
         MczFanSelect(coordinator, description)
         for description in FANS
         if params.fan_present(description.presence_index)
-    )
+    ]
+    if params.adaptive_available:
+        entities.append(MczAdaptiveModeSelect(coordinator))
+    async_add_entities(entities)
 
 
 class MczFanSelect(MczEntity, SelectEntity):
@@ -110,5 +119,30 @@ class MczFanSelect(MczEntity, SelectEntity):
     async def async_select_option(self, option: str) -> None:
         """Set the fan speed."""
         await self.coordinator.async_write(
-            self.entity_description.param_id, FAN_OPTIONS[option]
+            (self.entity_description.param_id, FAN_OPTIONS[option])
         )
+
+
+class MczAdaptiveModeSelect(MczEntity, SelectEntity):
+    """Adaptive mode profile (manual, dynamic, overnight, comfort, power)."""
+
+    _attr_translation_key = "adaptive_mode"
+    _attr_options = ADAPTIVE_MODE_KEYS
+
+    def __init__(self, coordinator: MczCoordinator) -> None:
+        """Initialize the select."""
+        super().__init__(coordinator, "adaptive_mode")
+
+    @property
+    def current_option(self) -> str | None:
+        """Return the active profile."""
+        return adaptive_mode_key(self.coordinator.data.info.get(INFO_ADAPTIVE_MODE))
+
+    async def async_select_option(self, option: str) -> None:
+        """Select a profile; like the app, also switch auto mode for manual/dynamic."""
+        writes = [(PARAM_ADAPTIVE_MODE, adaptive_mode_value(option))]
+        if option == "dynamic":
+            writes.append((PARAM_AUTO_MODE, 1))
+        elif option == "manual":
+            writes.append((PARAM_AUTO_MODE, 0))
+        await self.coordinator.async_write(*writes)

@@ -14,6 +14,8 @@ MAX_SCAN_INTERVAL: Final = 300
 
 CONF_SCAN_INTERVAL: Final = "scan_interval"
 
+ALARM_HISTORY_INTERVAL: Final = timedelta(minutes=5)
+
 MANUFACTURER: Final = "MCZ"
 DEFAULT_TITLE: Final = "MCZ Maestro"
 

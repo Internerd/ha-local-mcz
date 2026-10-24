@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -24,28 +25,24 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from .coordinator import MczConfigEntry, MczCoordinator, StoveData
 from .entity import MczEntity
 from .protocol import (
-    ADAPTIVE_MODE_KEYS,
-    CONTROL_MODE_KEYS,
     INFO_ACTIVE_TEMP,
     INFO_ACTIVE_VALUE,
-    INFO_ADAPTIVE_MODE,
     INFO_AUGER_RPM,
     INFO_AUGER_RPM_TARGET,
     INFO_BOARD_TEMP,
-    INFO_BUFFER_TARGET,
     INFO_BUFFER_TEMP,
-    INFO_CONTROL_MODE,
-    INFO_DHW_TARGET,
     INFO_EXHAUST_FAN_RPM,
     INFO_EXHAUST_TEMP,
+    INFO_HOURS_POWER_1,
     INFO_HOURS_TO_SERVICE,
+    INFO_HOURS_TOTAL,
+    INFO_IGNITIONS,
+    INFO_MINUTES_TO_SHUTDOWN,
     INFO_PUMP_PWM,
     INFO_RETURN_TEMP,
     INFO_ROOM_TEMP,
-    INFO_TANK_TARGET,
     INFO_TANK_TEMP,
     INFO_THREE_WAY_VALVE,
-    INFO_WATER_TARGET,
     INFO_WATER_TEMP,
     INFO_WIFI_PROBE_1,
     INFO_WIFI_PROBE_2,
@@ -53,7 +50,6 @@ from .protocol import (
     STATE_OPTIONS,
     THREE_WAY_VALVE_KEYS,
     StoveParameters,
-    adaptive_mode_key,
     state_key,
 )
 
@@ -64,7 +60,7 @@ PARALLEL_UPDATES = 0
 class MczSensorDescription(SensorEntityDescription):
     """Describes an MCZ sensor."""
 
-    value_fn: Callable[[StoveData], float | int | str | None]
+    value_fn: Callable[[StoveData], float | int | str | datetime | None]
     exists_fn: Callable[[StoveParameters], bool] = lambda _: True
 
 
@@ -84,6 +80,18 @@ def _keyed(index: int, keys: list[str]) -> Callable[[StoveData], str | None]:
         return keys[raw]
 
     return value
+
+
+def _hours(index: int) -> Callable[[StoveData], float | None]:
+    return lambda data: data.info.hours(index)
+
+
+def _last_alarm_state(data: StoveData) -> str | None:
+    return state_key(data.alarms[0].state) if data.alarms else None
+
+
+def _last_alarm_time(data: StoveData) -> datetime | None:
+    return data.alarms[0].time if data.alarms else None
 
 
 def _hydro(params: StoveParameters) -> bool:
@@ -157,19 +165,51 @@ SENSORS: tuple[MczSensorDescription, ...] = (
         value_fn=_raw(INFO_HOURS_TO_SERVICE),
     ),
     MczSensorDescription(
-        key="control_mode",
-        translation_key="control_mode",
-        device_class=SensorDeviceClass.ENUM,
-        options=CONTROL_MODE_KEYS,
-        value_fn=_keyed(INFO_CONTROL_MODE, CONTROL_MODE_KEYS),
+        key="operating_hours",
+        translation_key="operating_hours",
+        device_class=SensorDeviceClass.DURATION,
+        native_unit_of_measurement=UnitOfTime.HOURS,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        value_fn=_hours(INFO_HOURS_TOTAL),
+    ),
+    *(
+        MczSensorDescription(
+            key=f"operating_hours_power_{level}",
+            translation_key=f"operating_hours_power_{level}",
+            device_class=SensorDeviceClass.DURATION,
+            native_unit_of_measurement=UnitOfTime.HOURS,
+            state_class=SensorStateClass.TOTAL_INCREASING,
+            entity_category=EntityCategory.DIAGNOSTIC,
+            entity_registry_enabled_default=False,
+            value_fn=_hours(INFO_HOURS_POWER_1 + level - 1),
+        )
+        for level in range(1, 6)
     ),
     MczSensorDescription(
-        key="adaptive_mode",
-        translation_key="adaptive_mode",
+        key="ignitions",
+        translation_key="ignitions",
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        value_fn=_raw(INFO_IGNITIONS),
+    ),
+    MczSensorDescription(
+        key="minutes_to_shutdown",
+        translation_key="minutes_to_shutdown",
+        device_class=SensorDeviceClass.DURATION,
+        native_unit_of_measurement=UnitOfTime.MINUTES,
+        value_fn=_raw(INFO_MINUTES_TO_SHUTDOWN),
+    ),
+    MczSensorDescription(
+        key="last_alarm",
+        translation_key="last_alarm",
         device_class=SensorDeviceClass.ENUM,
-        options=ADAPTIVE_MODE_KEYS,
-        value_fn=lambda data: adaptive_mode_key(data.info.get(INFO_ADAPTIVE_MODE)),
-        exists_fn=lambda params: params.adaptive_available,
+        options=STATE_OPTIONS,
+        value_fn=_last_alarm_state,
+    ),
+    MczSensorDescription(
+        key="last_alarm_time",
+        translation_key="last_alarm_time",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        value_fn=_last_alarm_time,
     ),
     MczSensorDescription(
         key="active_value",
@@ -198,10 +238,6 @@ SENSORS: tuple[MczSensorDescription, ...] = (
     _temperature_sensor("water_temperature", INFO_WATER_TEMP, exists_fn=_hydro),
     _temperature_sensor("tank_temperature", INFO_TANK_TEMP, exists_fn=_hydro),
     _temperature_sensor("return_temperature", INFO_RETURN_TEMP, exists_fn=_hydro),
-    _temperature_sensor("water_target", INFO_WATER_TARGET, exists_fn=_hydro),
-    _temperature_sensor("buffer_target", INFO_BUFFER_TARGET, exists_fn=_hydro),
-    _temperature_sensor("tank_target", INFO_TANK_TARGET, exists_fn=_hydro),
-    _temperature_sensor("dhw_target", INFO_DHW_TARGET, exists_fn=_hydro),
     MczSensorDescription(
         key="pump_pwm",
         translation_key="pump_pwm",
@@ -249,6 +285,6 @@ class MczSensor(MczEntity, SensorEntity):
         self.entity_description = description
 
     @property
-    def native_value(self) -> float | int | str | None:
+    def native_value(self) -> float | int | str | datetime | None:
         """Return the sensor value."""
         return self.entity_description.value_fn(self.coordinator.data)

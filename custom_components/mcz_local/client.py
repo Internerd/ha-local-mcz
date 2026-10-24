@@ -5,23 +5,33 @@ from __future__ import annotations
 import asyncio
 from collections import deque
 import contextlib
+from datetime import datetime
 import logging
 
 import aiohttp
 from yarl import URL
 
 from .protocol import (
+    CMD_GET_ALARMS,
     CMD_GET_INFO,
     CMD_GET_PARAMETERS,
+    CMD_GET_VERSIONS,
     CMD_PONG,
+    CODE_ALARMS,
     CODE_INFO,
     CODE_PARAMETERS,
     CODE_PING,
+    CODE_VERSIONS,
+    AlarmEntry,
     ProtocolError,
     StoveInfo,
     StoveParameters,
+    StoveVersions,
+    parse_alarms,
     parse_info,
     parse_parameters,
+    parse_versions,
+    set_datetime,
     split_frame,
     write_parameter,
 )
@@ -35,6 +45,10 @@ RAW_FRAME_HISTORY = 20
 
 class MczConnectionError(Exception):
     """Raised when the stove can not be reached or stops answering."""
+
+
+class MczTimeoutError(MczConnectionError):
+    """Raised when the stove did not answer a request in time."""
 
 
 class MczClient:
@@ -51,6 +65,8 @@ class MczClient:
         self._waiters: dict[str, list[asyncio.Future[str]]] = {}
         self.parameters: StoveParameters | None = None
         self.info: StoveInfo | None = None
+        self.versions: StoveVersions | None = None
+        self.alarms: list[AlarmEntry] | None = None
         self.recent_frames: deque[str] = deque(maxlen=RAW_FRAME_HISTORY)
 
     @property
@@ -71,6 +87,10 @@ class MczClient:
             raise MczConnectionError(f"Cannot connect to {self._url}: {err}") from err
         self._reader = asyncio.create_task(self._read_loop(self._ws))
         await self.fetch_parameters()
+        if self.versions is None:
+            # Optional: older firmware may not answer; the next connect retries.
+            with contextlib.suppress(MczTimeoutError):
+                await self.fetch_versions()
 
     async def disconnect(self) -> None:
         """Close the WebSocket."""
@@ -107,6 +127,22 @@ class MczClient:
             raise MczConnectionError(str(err)) from err
         return self.info
 
+    async def fetch_versions(self) -> StoveVersions:
+        """Request firmware versions and serial (``0E``)."""
+        data = await self._request(CMD_GET_VERSIONS, CODE_VERSIONS)
+        self.versions = parse_versions(data)
+        return self.versions
+
+    async def fetch_alarms(self) -> list[AlarmEntry]:
+        """Request the alarm history (``0A``), newest first."""
+        data = await self._request(CMD_GET_ALARMS, CODE_ALARMS)
+        self.alarms = parse_alarms(data)
+        return self.alarms
+
+    async def set_clock(self, value: datetime) -> None:
+        """Set the stove clock."""
+        await self._send(set_datetime(value))
+
     async def write(self, param_id: int, value: int) -> None:
         """Send a ``WriteParametri`` command."""
         await self._send(write_parameter(param_id, value))
@@ -119,7 +155,7 @@ class MczClient:
             async with asyncio.timeout(RESPONSE_TIMEOUT):
                 return await future
         except TimeoutError as err:
-            raise MczConnectionError(f"No answer to {command}") from err
+            raise MczTimeoutError(f"No answer to {command}") from err
         finally:
             waiters = self._waiters.get(code, [])
             if future in waiters:

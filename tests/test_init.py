@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 
+from freezegun import freeze_time
 from homeassistant.components.climate import (
     ATTR_HVAC_ACTION,
     DOMAIN as CLIMATE_DOMAIN,
@@ -19,7 +20,7 @@ from homeassistant.components.select import (
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import device_registry as dr
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -42,7 +43,7 @@ async def test_setup_air_stove(
     hass: HomeAssistant,
     fake_stove: tuple[FakeStove, int],
     config_entry: MockConfigEntry,
-    entity_registry: er.EntityRegistry,
+    device_registry: dr.DeviceRegistry,
 ) -> None:
     """An air stove gets climate, sensors and only the installed fans."""
     _stove, _ = fake_stove
@@ -56,14 +57,36 @@ async def test_setup_air_stove(
     assert climate.attributes["temperature"] == 18.0
     assert climate.attributes["target_temp_step"] == 0.5
     assert climate.attributes[ATTR_HVAC_ACTION] == HVACAction.IDLE
+    assert climate.attributes["min_temp"] == 5
+    assert climate.attributes["max_temp"] == 35
 
     assert hass.states.get("sensor.mcz_maestro_state").state == "standby"
-    assert hass.states.get("sensor.mcz_maestro_adaptive_mode").state == "dynamic"
+    assert hass.states.get("select.mcz_maestro_adaptive_mode").state == "dynamic"
+    assert hass.states.get("switch.mcz_maestro_eco_stop").state == "on"
+    assert hass.states.get("switch.mcz_maestro_auto_mode").state == "on"
+    assert hass.states.get("switch.mcz_maestro_summer_mode").state == "on"
+    assert hass.states.get("switch.mcz_maestro_pellet_sensor").state == "on"
+    assert hass.states.get("switch.mcz_maestro_silent_mode").state == "off"
+    assert hass.states.get("sensor.mcz_maestro_operating_hours").state == "2.0"
+    assert hass.states.get("sensor.mcz_maestro_ignitions").state == "42"
+    assert hass.states.get("sensor.mcz_maestro_last_alarm").state == "alarm_a02"
+    assert hass.states.get("sensor.mcz_maestro_last_alarm_time").state == (
+        "2026-03-13T04:24:34+00:00"
+    )
+    assert hass.states.get("number.mcz_maestro_water_setpoint") is None
     assert hass.states.get("number.mcz_maestro_power_level").state == "3"
     assert hass.states.get("select.mcz_maestro_front_fan").state == "auto"
     assert hass.states.get("select.mcz_maestro_ducted_fan_1") is None
     assert hass.states.get("sensor.mcz_maestro_buffer_tank_temperature") is None
     assert hass.states.get("binary_sensor.mcz_maestro_alarm").state == "off"
+
+    device = device_registry.async_get_device(
+        identifiers={("mcz_local", config_entry.entry_id)}
+    )
+    assert device.serial_number == "MCZ-0000TEST0001"
+    assert device.sw_version == "1.11.1"
+    assert device.hw_version == "TE06"
+    assert ("mac", "0a:1b:2c:3d:4e:5f") in device.connections
 
     assert await hass.config_entries.async_unload(config_entry.entry_id)
     assert config_entry.state is ConfigEntryState.NOT_LOADED
@@ -83,6 +106,11 @@ async def test_hydro_entities(
     await _setup(hass, config_entry)
     assert hass.states.get("sensor.mcz_maestro_buffer_tank_temperature").state == "40.0"
     assert hass.states.get("sensor.mcz_maestro_water_temperature").state == "unknown"
+    setpoint = hass.states.get("number.mcz_maestro_water_setpoint")
+    assert setpoint.attributes["min"] == 30
+    assert setpoint.attributes["max"] == 80
+    # Buffer limits are 0/0 in the fake frame: no entity.
+    assert hass.states.get("number.mcz_maestro_buffer_tank_setpoint") is None
 
 
 async def test_commands(
@@ -133,6 +161,41 @@ async def test_commands(
         blocking=True,
     )
     await _wait_for(stove, "C|WriteParametri|1|255")
+
+    await hass.services.async_call(
+        SELECT_DOMAIN,
+        SERVICE_SELECT_OPTION,
+        {"entity_id": "select.mcz_maestro_adaptive_mode", "option": "manual"},
+        blocking=True,
+    )
+    await _wait_for(stove, "C|WriteParametri|149|10")
+    await _wait_for(stove, "C|WriteParametri|40|0")
+
+    await hass.services.async_call(
+        "switch",
+        "turn_on",
+        {"entity_id": "switch.mcz_maestro_chrono_schedule"},
+        blocking=True,
+    )
+    await _wait_for(stove, "C|WriteParametri|1111|1")
+
+    await hass.services.async_call(
+        "switch",
+        "turn_off",
+        {"entity_id": "switch.mcz_maestro_antifreeze"},
+        blocking=True,
+    )
+    await _wait_for(stove, "C|WriteParametri|154|0")
+
+    await hass.config.async_set_time_zone("Europe/Berlin")
+    with freeze_time("2026-10-24 10:29:00+00:00"):
+        await hass.services.async_call(
+            "button",
+            "press",
+            {"entity_id": "button.mcz_maestro_set_stove_clock"},
+            blocking=True,
+        )
+    await _wait_for(stove, "C|SalvaDataOra|241020261229")
 
 
 async def test_ping_is_answered(
@@ -207,3 +270,39 @@ async def test_power_level_out_of_range(
     stove.info = info_frame(i28=0)
     await _setup(hass, config_entry)
     assert hass.states.get("number.mcz_maestro_power_level").state == "unknown"
+
+
+async def test_stove_without_versions(
+    hass: HomeAssistant,
+    fake_stove: tuple[FakeStove, int],
+    config_entry: MockConfigEntry,
+    device_registry: dr.DeviceRegistry,
+    short_timeout: None,
+) -> None:
+    """Setup works when the stove does not answer RecuperoVersioneSW."""
+    stove, _ = fake_stove
+    stove.versions = None
+    await _setup(hass, config_entry)
+    assert config_entry.state is ConfigEntryState.LOADED
+    device = device_registry.async_get_device(
+        identifiers={("mcz_local", config_entry.entry_id)}
+    )
+    assert device.serial_number is None
+
+
+async def test_diagnostics_hide_serial(
+    hass: HomeAssistant,
+    fake_stove: tuple[FakeStove, int],
+    config_entry: MockConfigEntry,
+) -> None:
+    """Diagnostics contain raw frames but no serial or MAC."""
+    from custom_components.mcz_local.diagnostics import (
+        async_get_config_entry_diagnostics,
+    )
+
+    await _setup(hass, config_entry)
+    result = await async_get_config_entry_diagnostics(hass, config_entry)
+    text = str(result)
+    assert "MCZ-0000TEST0001" not in text
+    assert "0A1B2C3D4E5F" not in text
+    assert result["info"]["raw"].startswith("2e|")

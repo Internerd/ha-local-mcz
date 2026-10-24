@@ -21,6 +21,8 @@ from .protocol import (
     INFO_ROOM_TEMP,
     PARAM_POWER,
     PARAM_TARGET_TEMPERATURE,
+    PARAMS_ROOM_MAX,
+    PARAMS_ROOM_MIN,
     STATE_COOLING,
     STATE_SHUTDOWN,
     VALUE_POWER_OFF,
@@ -61,6 +63,10 @@ class MczClimate(MczEntity, ClimateEntity):
     def __init__(self, coordinator: MczCoordinator) -> None:
         """Initialize the climate entity."""
         super().__init__(coordinator, "climate")
+        if limits := coordinator.data.parameters.limits(
+            PARAMS_ROOM_MIN, PARAMS_ROOM_MAX
+        ):
+            self._attr_min_temp, self._attr_max_temp = limits
 
     @property
     def _state(self) -> int | None:
@@ -106,7 +112,7 @@ class MczClimate(MczEntity, ClimateEntity):
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
         """Switch the stove on or off."""
         value = VALUE_POWER_OFF if hvac_mode == HVACMode.OFF else VALUE_POWER_ON
-        await self.coordinator.async_write(PARAM_POWER, value)
+        await self.coordinator.async_write((PARAM_POWER, value))
 
     async def async_turn_on(self) -> None:
         """Switch the stove on."""
@@ -120,5 +126,5 @@ class MczClimate(MczEntity, ClimateEntity):
         """Set the room setpoint."""
         temperature = kwargs[ATTR_TEMPERATURE]
         await self.coordinator.async_write(
-            PARAM_TARGET_TEMPERATURE, encode_temperature(temperature)
+            (PARAM_TARGET_TEMPERATURE, encode_temperature(temperature))
         )

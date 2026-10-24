@@ -22,6 +22,10 @@ def info_frame(**overrides: int) -> str:
         17: 11,  # dynamic
         21: 1,  # temperature mode
         22: 1,  # eco stop
+        36: 7200,  # 2 h total
+        44: 42,  # ignitions
+        46: 10,  # pellet sensor on
+        50: 1,  # summer mode
         25: 36,  # target 18 °C
         27: 70,  # board 35 °C
         28: 13,  # power level 3
@@ -42,9 +46,20 @@ def params_frame(hydro: bool = False) -> str:
     """Build a ``00`` payload: 40 bytes."""
     values = [0] * 40
     values[1] = 1 if hydro else 0
+    values[2], values[3] = 5, 35  # room setpoint limits in °C
+    values[4], values[5] = 30, 80  # water setpoint limits
     values[8] = 1  # front fan present
     values[39] = 1  # adaptive available
     return "".join(format(v, "02x") for v in values)
+
+
+# Made-up identifiers, same layout as a real 0E answer.
+VERSIONS_FRAME = (
+    "0000000000000|010b01|5445303620202020|05|MCZ-0000TEST0001|00|1.0.0"
+    "|0A1B2C3D4E5F|1.0.0|1.0|N.C.|115200|115200"
+)
+# Ring buffer: newest entry (A02, 2026-03-13) is not the first slot.
+ALARMS_FRAME = "32|69a118c3|33|69b39182|ff|ffffffff|32|699ac8f6"
 
 
 class FakeStove:
@@ -55,6 +70,8 @@ class FakeStove:
         self.info = info_frame()
         self.params = params_frame()
         self.send_ping = False
+        self.versions: str | None = VERSIONS_FRAME
+        self.alarms = ALARMS_FRAME
         self.sockets: list[web.WebSocketResponse] = []
         self.app = web.Application()
         self.app.router.add_get("/", self._handler)
@@ -73,6 +90,10 @@ class FakeStove:
                 await ws.send_str(f"00|{self.params}")
             elif msg.data == "C|RecuperoInfo":
                 await ws.send_str(f"01|{self.info}")
+            elif msg.data == "C|RecuperoVersioneSW" and self.versions is not None:
+                await ws.send_str(f"0E|{self.versions}")
+            elif msg.data == "C|RecuperaAllarmi":
+                await ws.send_str(f"0A|{self.alarms}")
         return ws
 
     async def close(self) -> None:
