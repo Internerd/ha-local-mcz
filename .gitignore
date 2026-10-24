@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+.coverage
+htmlcov/
+
+# Private reverse-engineering notes and app material must never be committed.
+MCZ-*.md
+entschluesselt/
+*.apk

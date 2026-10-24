@@ -1,0 +1,258 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to the stove",
+        "description": "Enter the IP address of the stove's Wi-Fi module. The local WebSocket interface listens on port 81 by default.",
+        "data": {
+          "host": "Host",
+          "port": "Port"
+        },
+        "data_description": {
+          "host": "IP address or hostname of the stove. A fixed IP / DHCP reservation is recommended."
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not connect to the stove or it did not answer.",
+      "unknown": "Unexpected error, see the log."
+    },
+    "abort": {
+      "already_configured": "This stove is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Options",
+        "data": {
+          "scan_interval": "Polling interval (seconds)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "alarm": {
+        "name": "Alarm"
+      },
+      "brazier": {
+        "name": "Brazier needs cleaning"
+      },
+      "igniter": {
+        "name": "Igniter"
+      },
+      "eco_stop": {
+        "name": "Eco stop"
+      }
+    },
+    "button": {
+      "alarm_reset": {
+        "name": "Reset alarm"
+      }
+    },
+    "climate": {
+      "stove": {
+        "name": "Stove"
+      }
+    },
+    "number": {
+      "power_level": {
+        "name": "Power level"
+      }
+    },
+    "select": {
+      "fan_front": {
+        "name": "Front fan",
+        "state": {
+          "off": "Off",
+          "1": "1",
+          "2": "2",
+          "3": "3",
+          "4": "4",
+          "5": "5",
+          "auto": "Auto"
+        }
+      },
+      "fan_duct_1": {
+        "name": "Ducted fan 1",
+        "state": {
+          "off": "Off",
+          "1": "1",
+          "2": "2",
+          "3": "3",
+          "4": "4",
+          "5": "5",
+          "auto": "Auto"
+        }
+      },
+      "fan_duct_2": {
+        "name": "Ducted fan 2",
+        "state": {
+          "off": "Off",
+          "1": "1",
+          "2": "2",
+          "3": "3",
+          "4": "4",
+          "5": "5",
+          "auto": "Auto"
+        }
+      }
+    },
+    "sensor": {
+      "state": {
+        "name": "State",
+        "state": {
+          "off": "Off",
+          "check": "Checking",
+          "cleaning_cold": "Cleaning (cold)",
+          "loading_cold": "Loading pellets (cold)",
+          "start_1_cold": "Start 1 (cold)",
+          "start_2_cold": "Start 2 (cold)",
+          "cleaning_warm": "Cleaning (warm)",
+          "loading_warm": "Loading pellets (warm)",
+          "start_1_warm": "Start 1 (warm)",
+          "start_2_warm": "Start 2 (warm)",
+          "stabilization": "Stabilizing",
+          "power_1": "Power 1",
+          "power_2": "Power 2",
+          "power_3": "Power 3",
+          "power_4": "Power 4",
+          "power_5": "Power 5",
+          "power_6": "Power 6",
+          "power_7": "Power 7",
+          "power_8": "Power 8",
+          "power_9": "Power 9",
+          "power_10": "Power 10",
+          "power_11": "Power 11",
+          "power_12": "Power 12",
+          "power_13": "Power 13",
+          "power_14": "Power 14",
+          "power_15": "Power 15",
+          "power_16": "Power 16",
+          "power_17": "Power 17",
+          "power_18": "Power 18",
+          "power_19": "Power 19",
+          "power_20": "Power 20",
+          "shutdown": "Shutting down",
+          "cooling": "Cooling down",
+          "cleaning_low": "Cleaning (low)",
+          "cleaning_high": "Cleaning (high)",
+          "auger_unlock": "Unblocking auger",
+          "auto_eco": "Auto eco",
+          "standby": "Standby",
+          "diagnostics": "Diagnostics",
+          "auger_loading": "Loading auger",
+          "alarm_a01": "A01 – Ignition failed",
+          "alarm_a02": "A02 – No flame",
+          "alarm_a03": "A03 – Pellet safety",
+          "alarm_a04": "A04 – Exhaust temperature",
+          "alarm_a05": "A05 – Obstruction",
+          "alarm_a08": "A08 – Exhaust fan",
+          "alarm_a09": "A09 – Exhaust probe",
+          "alarm_a11": "A11 – Gear motor",
+          "alarm_a13": "A13 – Board temperature",
+          "alarm_a14": "A14 – Active sensor faulty",
+          "alarm_a18": "A18 – Water thermostat",
+          "alarm_a19": "A19 – Water probe faulty",
+          "alarm_a20": "A20 – Auxiliary probe faulty",
+          "alarm_a21": "A21 – Pressure switch",
+          "alarm_a22": "A22 – Room probe faulty",
+          "alarm_a23": "A23 – Brazier does not close",
+          "waiting_safety_alarm": "Waiting for safety alarms",
+          "waiting_recipe_db": "Waiting for recipe database",
+          "waiting_serial": "Waiting for serial number",
+          "alarm_unknown": "Unknown alarm",
+          "unknown": "Unknown"
+        }
+      },
+      "room_temperature": {
+        "name": "Room temperature"
+      },
+      "exhaust_temperature": {
+        "name": "Exhaust temperature"
+      },
+      "board_temperature": {
+        "name": "Board temperature"
+      },
+      "exhaust_fan_speed": {
+        "name": "Exhaust fan speed"
+      },
+      "auger_speed": {
+        "name": "Auger speed"
+      },
+      "auger_speed_target": {
+        "name": "Auger target speed"
+      },
+      "hours_to_service": {
+        "name": "Hours until service"
+      },
+      "control_mode": {
+        "name": "Control mode",
+        "state": {
+          "power": "Power",
+          "temperature": "Temperature"
+        }
+      },
+      "adaptive_mode": {
+        "name": "Adaptive mode",
+        "state": {
+          "manual": "Manual",
+          "dynamic": "Dynamic",
+          "overnight": "Overnight",
+          "comfort": "Comfort",
+          "power": "Power"
+        }
+      },
+      "active_value": {
+        "name": "Active value"
+      },
+      "active_temperature": {
+        "name": "Active temperature"
+      },
+      "wifi_probe_1": {
+        "name": "Wireless probe 1"
+      },
+      "wifi_probe_2": {
+        "name": "Wireless probe 2"
+      },
+      "wifi_probe_3": {
+        "name": "Wireless probe 3"
+      },
+      "buffer_temperature": {
+        "name": "Buffer tank temperature"
+      },
+      "water_temperature": {
+        "name": "Water temperature"
+      },
+      "tank_temperature": {
+        "name": "Hot water tank temperature"
+      },
+      "return_temperature": {
+        "name": "Return temperature"
+      },
+      "water_target": {
+        "name": "Water target temperature"
+      },
+      "buffer_target": {
+        "name": "Buffer tank target temperature"
+      },
+      "tank_target": {
+        "name": "Hot water tank target temperature"
+      },
+      "dhw_target": {
+        "name": "Domestic hot water target temperature"
+      },
+      "pump_pwm": {
+        "name": "Pump"
+      },
+      "three_way_valve": {
+        "name": "3-way valve",
+        "state": {
+          "heating": "Heating",
+          "sanitary": "Domestic hot water"
+        }
+      }
+    }
+  }
+}

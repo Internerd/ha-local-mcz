@@ -1,0 +1,12 @@
+{
+  "domain": "mcz_local",
+  "name": "MCZ Maestro (local)",
+  "codeowners": ["@internerd"],
+  "config_flow": true,
+  "documentation": "https://github.com/internerd/ha-local-mcz",
+  "integration_type": "device",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/internerd/ha-local-mcz/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}
