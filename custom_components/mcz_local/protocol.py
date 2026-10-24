@@ -20,6 +20,7 @@ from datetime import UTC, datetime
 CODE_PING = "PING"
 CODE_PARAMETERS = "00"
 CODE_INFO = "01"
+CODE_CHRONO = "04"
 CODE_ALARMS = "0A"
 CODE_VERSIONS = "0E"
 
@@ -27,12 +28,15 @@ CODE_VERSIONS = "0E"
 CMD_GET_PARAMETERS = "C|RecuperoParametri"
 CMD_GET_INFO = "C|RecuperoInfo"
 CMD_GET_ALARMS = "C|RecuperaAllarmi"
+CMD_GET_CHRONO = "C|RecuperoGiornoChrono"
 CMD_GET_VERSIONS = "C|RecuperoVersioneSW"
 CMD_PONG = "P|PONG"
 
 # --- WriteParametri ids -----------------------------------------------------
 PARAM_ALARM_RESET = 1
+PARAM_ACTIVE_RESET = 2
 PARAM_POWER = 34
+PARAM_ACTIVE = 35
 PARAM_POWER_LEVEL = 36
 PARAM_FAN_FRONT = 37
 PARAM_FAN_DUCT_1 = 38
@@ -46,15 +50,18 @@ PARAM_WATER_TARGET = 51
 PARAM_BUFFER_TARGET = 52
 PARAM_TANK_TARGET = 53
 PARAM_DHW_TARGET = 54
+PARAM_SLEEP = 57
 PARAM_SUMMER_MODE = 58
 PARAM_PELLET_SENSOR = 148
 PARAM_ADAPTIVE_MODE = 149
 PARAM_ANTIFREEZE = 154
+PARAM_CHRONO_T1 = 1108  # 1108..1110 = T1..T3, whole °C
 PARAM_CHRONO = 1111
 
 VALUE_POWER_ON = 1
 VALUE_POWER_OFF = 40
 VALUE_ALARM_RESET = 255
+VALUE_ACTIVE_RESET = 255
 
 POWER_LEVEL_MIN = 1
 POWER_LEVEL_MAX = 5
@@ -81,6 +88,7 @@ INFO_THREE_WAY_VALVE = 14
 INFO_PUMP_PWM = 15
 INFO_BRAZIER = 16
 INFO_ADAPTIVE_MODE = 17
+INFO_ACTIVE = 19
 INFO_ACTIVE_VALUE = 20
 INFO_CONTROL_MODE = 21
 INFO_ECO_STOP = 22
@@ -100,6 +108,7 @@ INFO_ACTIVE_TEMP = 45
 INFO_PELLET_SENSOR = 46
 INFO_UNIT = 47
 INFO_SOUND = 48
+INFO_SLEEP = 49
 INFO_SUMMER_MODE = 50
 INFO_WIFI_PROBE_1 = 51
 INFO_WIFI_PROBE_2 = 52
@@ -213,6 +222,18 @@ def _firmware(value: str | None) -> tuple[int, int, int] | None:
         return (int(value[0:2], 16), int(value[2:4], 16), int(value[4:6], 16))
     except ValueError:
         return None
+
+
+# Sleep timer: WriteParametri|57|n, n = 1..49 steps of 10 minutes, 0 = off.
+SLEEP_STEP_MINUTES = 10
+SLEEP_MAX_STEPS = 49
+
+# Chrono: 7 days x 48 half-hour slots, 2 bits each (0 = off, 1..3 = T1..T3).
+CHRONO_DAYS = 7
+CHRONO_SLOTS = 48
+CHRONO_LEVELS = 3
+# (min, max) in whole °C for T1, T2, T3; T1 < T2 < T3.
+CHRONO_TEMP_LIMITS = ((5, 33), (6, 34), (7, 35))
 
 
 class ProtocolError(Exception):
@@ -386,6 +407,91 @@ def parse_alarms(data: str) -> list[AlarmEntry]:
             continue
     # The stove keeps a ring buffer, so slot order is not chronological.
     return sorted(entries, key=lambda entry: entry.time, reverse=True)
+
+
+@dataclass(frozen=True)
+class ChronoProgram:
+    """Weekly schedule (``04`` frame)."""
+
+    days: tuple[tuple[int, ...], ...]
+    temperatures: tuple[int, int, int]
+
+
+def decode_chrono_day(value: str) -> tuple[int, ...]:
+    """24 hex chars -> 48 slot levels, MSB first."""
+    if len(value) != CHRONO_SLOTS // 2:
+        raise ProtocolError(f"Chrono day must be 24 hex chars, got {value!r}")
+    try:
+        bits = "".join(f"{int(value[i : i + 2], 16):08b}" for i in range(0, 24, 2))
+    except ValueError as err:
+        raise ProtocolError(f"Chrono day is not hexadecimal: {value!r}") from err
+    return tuple(int(bits[i : i + 2], 2) for i in range(0, CHRONO_SLOTS * 2, 2))
+
+
+def encode_chrono_day(slots: list[int] | tuple[int, ...]) -> str:
+    """48 slot levels -> 24 hex chars (inverse of decode_chrono_day)."""
+    if len(slots) != CHRONO_SLOTS or any(
+        not 0 <= slot <= CHRONO_LEVELS for slot in slots
+    ):
+        raise ValueError("A chrono day needs 48 slots with levels 0..3")
+    bits = "".join(f"{slot:02b}" for slot in slots)
+    return "".join(f"{int(bits[i : i + 8], 2):02x}" for i in range(0, 96, 8))
+
+
+def parse_chrono(data: str) -> ChronoProgram:
+    """Parse ``<day0>|...|<day6>|<T1>|<T2>|<T3>``."""
+    fields = data.strip().split("|")
+    if len(fields) < CHRONO_DAYS + 3:
+        raise ProtocolError(f"Chrono frame has {len(fields)} fields")
+    days = tuple(decode_chrono_day(day) for day in fields[:CHRONO_DAYS])
+    try:
+        t1, t2, t3 = (int(value, 16) for value in fields[CHRONO_DAYS : CHRONO_DAYS + 3])
+    except ValueError as err:
+        raise ProtocolError("Chrono temperatures are not hexadecimal") from err
+    return ChronoProgram(days=days, temperatures=(t1, t2, t3))
+
+
+def write_chrono_day(day: int, slots: list[int] | tuple[int, ...]) -> str:
+    """Build the ``ScriviGiornoChrono`` command for day 0..6."""
+    if not 0 <= day < CHRONO_DAYS:
+        raise ValueError("Chrono day must be 0..6")
+    return f"C|ScriviGiornoChrono|{day}|{encode_chrono_day(slots)}"
+
+
+def chrono_periods(slots: tuple[int, ...]) -> list[dict[str, str | int]]:
+    """Group consecutive slots with the same level into from/to periods."""
+    periods: list[dict[str, str | int]] = []
+    start = 0
+    for index in range(1, CHRONO_SLOTS + 1):
+        if index == CHRONO_SLOTS or slots[index] != slots[start]:
+            if slots[start]:
+                periods.append(
+                    {
+                        "from": _slot_time(start),
+                        "to": _slot_time(index),
+                        "level": slots[start],
+                    }
+                )
+            start = index
+    return periods
+
+
+def _slot_time(slot: int) -> str:
+    return f"{slot // 2:02d}:{30 * (slot % 2):02d}"
+
+
+def sleep_minutes(raw: int | None) -> int | None:
+    """RecuperoInfo[49] -> remaining sleep minutes (0 = off)."""
+    if raw is None:
+        return None
+    return max(raw - 1, 0) * SLEEP_STEP_MINUTES
+
+
+def sleep_steps(minutes: float) -> int:
+    """Minutes -> WriteParametri|57 value (0 = off, else 2..49)."""
+    if minutes <= 0:
+        return 0
+    return min(round(minutes / SLEEP_STEP_MINUTES) + 1, SLEEP_MAX_STEPS)
 
 
 def set_datetime(value: datetime) -> str:

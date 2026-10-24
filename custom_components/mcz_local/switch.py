@@ -13,6 +13,8 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from .coordinator import MczConfigEntry, MczCoordinator
 from .entity import MczEntity
 from .protocol import (
+    CHRONO_DAYS,
+    INFO_ACTIVE,
     INFO_ANTIFREEZE,
     INFO_CHRONO,
     INFO_CONTROL_MODE,
@@ -21,6 +23,7 @@ from .protocol import (
     INFO_SILENT_MODE,
     INFO_SOUND,
     INFO_SUMMER_MODE,
+    PARAM_ACTIVE,
     PARAM_ANTIFREEZE,
     PARAM_AUTO_MODE,
     PARAM_CHRONO,
@@ -29,6 +32,7 @@ from .protocol import (
     PARAM_SILENT_MODE,
     PARAM_SOUND,
     PARAM_SUMMER_MODE,
+    chrono_periods,
 )
 
 PARALLEL_UPDATES = 1
@@ -68,6 +72,12 @@ SWITCHES: tuple[MczSwitchDescription, ...] = (
         info_index=INFO_CHRONO,
     ),
     MczSwitchDescription(
+        key="active",
+        translation_key="active",
+        param_id=PARAM_ACTIVE,
+        info_index=INFO_ACTIVE,
+    ),
+    MczSwitchDescription(
         key="summer_mode",
         translation_key="summer_mode",
         param_id=PARAM_SUMMER_MODE,
@@ -105,7 +115,12 @@ async def async_setup_entry(
 ) -> None:
     """Set up switches."""
     coordinator = entry.runtime_data
-    async_add_entities(MczSwitch(coordinator, description) for description in SWITCHES)
+    async_add_entities(
+        (MczChronoSwitch if description.key == "chrono" else MczSwitch)(
+            coordinator, description
+        )
+        for description in SWITCHES
+    )
 
 
 class MczSwitch(MczEntity, SwitchEntity):
@@ -133,3 +148,19 @@ class MczSwitch(MczEntity, SwitchEntity):
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Switch the setting off."""
         await self.coordinator.async_write((self.entity_description.param_id, 0))
+
+
+class MczChronoSwitch(MczSwitch):
+    """Chrono on/off; the weekly schedule is exposed as attributes."""
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        """Return T1..T3 and the periods of each day (0..6)."""
+        chrono = self.coordinator.data.chrono
+        if chrono is None:
+            return None
+        t1, t2, t3 = chrono.temperatures
+        attributes: dict[str, Any] = {"t1": t1, "t2": t2, "t3": t3}
+        for day in range(CHRONO_DAYS):
+            attributes[f"day_{day}"] = chrono_periods(chrono.days[day])
+        return attributes

@@ -46,6 +46,35 @@
   "exceptions": {
     "write_failed": {
       "message": "Sending the command to the stove failed: {error}"
+    },
+    "chrono_order": {
+      "message": "The chrono temperatures must rise from T1 to T3 (would be {t1} / {t2} / {t3} °C)."
+    },
+    "entry_not_loaded": {
+      "message": "The selected stove is not loaded."
+    },
+    "invalid_periods": {
+      "message": "Invalid schedule: {error}"
+    }
+  },
+  "services": {
+    "set_chrono_day": {
+      "name": "Set chrono day",
+      "description": "Replaces the schedule of one day. Times not covered by a period are off.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Stove",
+          "description": "The stove to program."
+        },
+        "day": {
+          "name": "Day",
+          "description": "Day index 0-6 as used by the stove."
+        },
+        "periods": {
+          "name": "Periods",
+          "description": "List of periods with from, to (HH:MM on full or half hours, 00:00 as end means midnight) and level 1-3 (T1-T3)."
+        }
+      }
     }
   },
   "entity": {
@@ -60,6 +89,9 @@
     "button": {
       "alarm_reset": {
         "name": "Reset alarm"
+      },
+      "active_reset": {
+        "name": "Reset Active calibration"
       },
       "sync_clock": {
         "name": "Set stove clock"
@@ -85,6 +117,18 @@
       },
       "dhw_setpoint": {
         "name": "Domestic hot water setpoint"
+      },
+      "sleep_timer": {
+        "name": "Sleep timer"
+      },
+      "chrono_t1": {
+        "name": "Chrono T1"
+      },
+      "chrono_t2": {
+        "name": "Chrono T2"
+      },
+      "chrono_t3": {
+        "name": "Chrono T3"
       }
     },
     "select": {
@@ -136,6 +180,9 @@
       }
     },
     "switch": {
+      "active": {
+        "name": "Active"
+      },
       "auto_mode": {
         "name": "Auto mode"
       },

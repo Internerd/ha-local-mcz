@@ -10,7 +10,12 @@ from homeassistant.util import dt as dt_util
 
 from .coordinator import MczConfigEntry, MczCoordinator
 from .entity import MczEntity
-from .protocol import PARAM_ALARM_RESET, VALUE_ALARM_RESET
+from .protocol import (
+    PARAM_ACTIVE_RESET,
+    PARAM_ALARM_RESET,
+    VALUE_ACTIVE_RESET,
+    VALUE_ALARM_RESET,
+)
 
 PARALLEL_UPDATES = 1
 
@@ -23,7 +28,11 @@ async def async_setup_entry(
     """Set up buttons."""
     coordinator = entry.runtime_data
     async_add_entities(
-        [MczAlarmResetButton(coordinator), MczSyncClockButton(coordinator)]
+        [
+            MczAlarmResetButton(coordinator),
+            MczActiveResetButton(coordinator),
+            MczSyncClockButton(coordinator),
+        ]
     )
 
 
@@ -39,6 +48,21 @@ class MczAlarmResetButton(MczEntity, ButtonEntity):
     async def async_press(self) -> None:
         """Reset the alarm."""
         await self.coordinator.async_write((PARAM_ALARM_RESET, VALUE_ALARM_RESET))
+
+
+class MczActiveResetButton(MczEntity, ButtonEntity):
+    """Reset the Active combustion calibration."""
+
+    _attr_translation_key = "active_reset"
+    _attr_entity_category = EntityCategory.CONFIG
+
+    def __init__(self, coordinator: MczCoordinator) -> None:
+        """Initialize the button."""
+        super().__init__(coordinator, "active_reset")
+
+    async def async_press(self) -> None:
+        """Reset the Active calibration."""
+        await self.coordinator.async_write((PARAM_ACTIVE_RESET, VALUE_ACTIVE_RESET))
 
 
 class MczSyncClockButton(MczEntity, ButtonEntity):

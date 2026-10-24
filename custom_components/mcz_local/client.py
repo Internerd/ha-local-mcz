@@ -13,26 +13,31 @@ from yarl import URL
 
 from .protocol import (
     CMD_GET_ALARMS,
+    CMD_GET_CHRONO,
     CMD_GET_INFO,
     CMD_GET_PARAMETERS,
     CMD_GET_VERSIONS,
     CMD_PONG,
     CODE_ALARMS,
+    CODE_CHRONO,
     CODE_INFO,
     CODE_PARAMETERS,
     CODE_PING,
     CODE_VERSIONS,
     AlarmEntry,
+    ChronoProgram,
     ProtocolError,
     StoveInfo,
     StoveParameters,
     StoveVersions,
     parse_alarms,
+    parse_chrono,
     parse_info,
     parse_parameters,
     parse_versions,
     set_datetime,
     split_frame,
+    write_chrono_day,
     write_parameter,
 )
 
@@ -67,6 +72,7 @@ class MczClient:
         self.info: StoveInfo | None = None
         self.versions: StoveVersions | None = None
         self.alarms: list[AlarmEntry] | None = None
+        self.chrono: ChronoProgram | None = None
         self.recent_frames: deque[str] = deque(maxlen=RAW_FRAME_HISTORY)
 
     @property
@@ -138,6 +144,19 @@ class MczClient:
         data = await self._request(CMD_GET_ALARMS, CODE_ALARMS)
         self.alarms = parse_alarms(data)
         return self.alarms
+
+    async def fetch_chrono(self) -> ChronoProgram:
+        """Request the weekly schedule (``04``)."""
+        data = await self._request(CMD_GET_CHRONO, CODE_CHRONO)
+        try:
+            self.chrono = parse_chrono(data)
+        except ProtocolError as err:
+            raise MczConnectionError(str(err)) from err
+        return self.chrono
+
+    async def write_chrono_day(self, day: int, slots: list[int]) -> None:
+        """Write one day of the schedule."""
+        await self._send(write_chrono_day(day, slots))
 
     async def set_clock(self, value: datetime) -> None:
         """Set the stove clock."""

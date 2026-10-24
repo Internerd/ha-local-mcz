@@ -14,8 +14,14 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from homeassistant.util import dt as dt_util
 
 from .client import MczClient, MczConnectionError, MczTimeoutError
-from .const import ALARM_HISTORY_INTERVAL, DOMAIN, scan_interval
-from .protocol import AlarmEntry, StoveInfo, StoveParameters, StoveVersions
+from .const import DOMAIN, SLOW_UPDATE_INTERVAL, scan_interval
+from .protocol import (
+    AlarmEntry,
+    ChronoProgram,
+    StoveInfo,
+    StoveParameters,
+    StoveVersions,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -30,6 +36,7 @@ class StoveData:
     info: StoveInfo
     versions: StoveVersions | None
     alarms: list[AlarmEntry] | None
+    chrono: ChronoProgram | None
 
 
 class MczCoordinator(DataUpdateCoordinator[StoveData]):
@@ -53,14 +60,14 @@ class MczCoordinator(DataUpdateCoordinator[StoveData]):
             update_interval=scan_interval(interval_seconds),
         )
         self.client = client
-        self._alarms_fetched: datetime | None = None
+        self._slow_fetched: datetime | None = None
 
     async def _async_update_data(self) -> StoveData:
         try:
             if not self.client.connected:
                 await self.client.connect()
             info = await self.client.fetch_info()
-            await self._async_update_alarms()
+            await self._async_update_slow()
         except MczConnectionError as err:
             await self.client.disconnect()
             raise UpdateFailed(str(err)) from err
@@ -70,21 +77,23 @@ class MczCoordinator(DataUpdateCoordinator[StoveData]):
             info=info,
             versions=self.client.versions,
             alarms=self.client.alarms,
+            chrono=self.client.chrono,
         )
 
-    async def _async_update_alarms(self) -> None:
-        """Refresh the alarm history now and then; it changes rarely."""
+    async def _async_update_slow(self) -> None:
+        """Refresh alarm history and schedule now and then; they change rarely."""
         now = dt_util.utcnow()
         if (
-            self._alarms_fetched is not None
-            and now - self._alarms_fetched < ALARM_HISTORY_INTERVAL
+            self._slow_fetched is not None
+            and now - self._slow_fetched < SLOW_UPDATE_INTERVAL
         ):
             return
-        self._alarms_fetched = now
-        try:
-            await self.client.fetch_alarms()
-        except MczTimeoutError:
-            _LOGGER.debug("Stove did not answer the alarm history request")
+        self._slow_fetched = now
+        for fetch in (self.client.fetch_alarms, self.client.fetch_chrono):
+            try:
+                await fetch()
+            except MczTimeoutError:
+                _LOGGER.debug("Stove did not answer %s", fetch.__name__)
 
     async def _async_command(self, command: Callable[[], Awaitable[None]]) -> None:
         try:
@@ -99,12 +108,26 @@ class MczCoordinator(DataUpdateCoordinator[StoveData]):
                 translation_placeholders={"error": str(err)},
             ) from err
 
-    async def async_write(self, *writes: tuple[int, int]) -> None:
+    async def async_write(
+        self, *writes: tuple[int, int], refresh_chrono: bool = False
+    ) -> None:
         """Send one or more WriteParametri commands, then refresh."""
 
         async def send() -> None:
             for param_id, value in writes:
                 await self.client.write(param_id, value)
+            if refresh_chrono:
+                await self.client.fetch_chrono()
+
+        await self._async_command(send)
+        await self.async_request_refresh()
+
+    async def async_write_chrono_day(self, day: int, slots: list[int]) -> None:
+        """Write one schedule day and read the schedule back."""
+
+        async def send() -> None:
+            await self.client.write_chrono_day(day, slots)
+            await self.client.fetch_chrono()
 
         await self._async_command(send)
         await self.async_request_refresh()

@@ -19,10 +19,11 @@ from homeassistant.components.select import (
 )
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
+import voluptuous as vol
 
 from .fake_stove import FakeStove, info_frame
 
@@ -340,3 +341,121 @@ async def test_brazier_not_present(
     stove.info = info_frame(i16=0xFF)
     await _setup(hass, config_entry)
     assert hass.states.get("sensor.mcz_maestro_brazier") is None
+
+
+async def test_chrono_sleep_active(
+    hass: HomeAssistant,
+    fake_stove: tuple[FakeStove, int],
+    config_entry: MockConfigEntry,
+) -> None:
+    """Chrono temps, schedule attributes, sleep timer and Active are wired up."""
+    stove, _ = fake_stove
+    await _setup(hass, config_entry)
+
+    assert hass.states.get("number.mcz_maestro_chrono_t3").state == "18"
+    chrono = hass.states.get("switch.mcz_maestro_chrono_schedule")
+    assert chrono.attributes["t1"] == 9
+    assert chrono.attributes["day_1"][1] == {"from": "08:00", "to": "17:00", "level": 3}
+    assert hass.states.get("number.mcz_maestro_sleep_timer").state == "30"
+    assert hass.states.get("switch.mcz_maestro_active").state == "off"
+
+    await hass.services.async_call(
+        "number",
+        "set_value",
+        {"entity_id": "number.mcz_maestro_sleep_timer", "value": 60},
+        blocking=True,
+    )
+    await _wait_for(stove, "C|WriteParametri|57|7")
+
+    await hass.services.async_call(
+        "switch", "turn_on", {"entity_id": "switch.mcz_maestro_active"}, blocking=True
+    )
+    await _wait_for(stove, "C|WriteParametri|35|1")
+
+    await hass.services.async_call(
+        "button",
+        "press",
+        {"entity_id": "button.mcz_maestro_reset_active_calibration"},
+        blocking=True,
+    )
+    await _wait_for(stove, "C|WriteParametri|2|255")
+
+    # T2 = 9 equals T1; raising T3 must still work.
+    await hass.services.async_call(
+        "number",
+        "set_value",
+        {"entity_id": "number.mcz_maestro_chrono_t3", "value": 20},
+        blocking=True,
+    )
+    await _wait_for(stove, "C|WriteParametri|1110|20")
+
+    with pytest.raises(ServiceValidationError) as err:
+        await hass.services.async_call(
+            "number",
+            "set_value",
+            {"entity_id": "number.mcz_maestro_chrono_t2", "value": 25},
+            blocking=True,
+        )
+    assert err.value.translation_key == "chrono_order"
+
+
+async def test_set_chrono_day_service(
+    hass: HomeAssistant,
+    fake_stove: tuple[FakeStove, int],
+    config_entry: MockConfigEntry,
+) -> None:
+    """The service writes one day and the schedule is read back."""
+    stove, _ = fake_stove
+    await _setup(hass, config_entry)
+
+    await hass.services.async_call(
+        "mcz_local",
+        "set_chrono_day",
+        {
+            "config_entry_id": config_entry.entry_id,
+            "day": 2,
+            "periods": [
+                {"from": "06:00", "to": "08:30", "level": 3},
+                {"from": "22:00", "to": "00:00", "level": 1},
+            ],
+        },
+        blocking=True,
+    )
+    expected = ["0"] * 48
+    expected[12:17] = ["3"] * 5
+    expected[44:48] = ["1"] * 4
+    frame = "C|ScriviGiornoChrono|2|" + "".join(
+        f"{int(''.join(f'{int(s):02b}' for s in expected[i : i + 4]), 2):02x}"
+        for i in range(0, 48, 4)
+    )
+    await _wait_for(stove, frame)
+    await hass.async_block_till_done()
+    assert hass.states.get("switch.mcz_maestro_chrono_schedule").attributes[
+        "day_2"
+    ] == [
+        {"from": "06:00", "to": "08:30", "level": 3},
+        {"from": "22:00", "to": "24:00", "level": 1},
+    ]
+
+    with pytest.raises(ServiceValidationError):
+        await hass.services.async_call(
+            "mcz_local",
+            "set_chrono_day",
+            {
+                "config_entry_id": config_entry.entry_id,
+                "day": 2,
+                "periods": [{"from": "09:00", "to": "08:00", "level": 1}],
+            },
+            blocking=True,
+        )
+    with pytest.raises(vol.Invalid):
+        await hass.services.async_call(
+            "mcz_local",
+            "set_chrono_day",
+            {
+                "config_entry_id": config_entry.entry_id,
+                "day": 2,
+                "periods": [{"from": "09:15", "to": "10:00", "level": 1}],
+            },
+            blocking=True,
+        )

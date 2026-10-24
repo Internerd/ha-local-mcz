@@ -46,6 +46,35 @@
   "exceptions": {
     "write_failed": {
       "message": "Der Befehl konnte nicht an den Ofen gesendet werden: {error}"
+    },
+    "chrono_order": {
+      "message": "Die Chrono-Temperaturen müssen von T1 nach T3 steigen (wäre {t1} / {t2} / {t3} °C)."
+    },
+    "entry_not_loaded": {
+      "message": "Der gewählte Ofen ist nicht geladen."
+    },
+    "invalid_periods": {
+      "message": "Ungültiger Zeitplan: {error}"
+    }
+  },
+  "services": {
+    "set_chrono_day": {
+      "name": "Chrono-Tag setzen",
+      "description": "Ersetzt den Zeitplan eines Tages. Zeiten ohne Zeitraum sind aus.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Ofen",
+          "description": "Der Ofen, der programmiert wird."
+        },
+        "day": {
+          "name": "Tag",
+          "description": "Tagesindex 0-6, wie ihn der Ofen verwendet."
+        },
+        "periods": {
+          "name": "Zeiträume",
+          "description": "Liste von Zeiträumen mit from, to (HH:MM auf volle oder halbe Stunden, 00:00 als Ende = Mitternacht) und level 1-3 (T1-T3)."
+        }
+      }
     }
   },
   "entity": {
@@ -60,6 +89,9 @@
     "button": {
       "alarm_reset": {
         "name": "Alarm zurücksetzen"
+      },
+      "active_reset": {
+        "name": "Active-Kalibrierung zurücksetzen"
       },
       "sync_clock": {
         "name": "Ofenuhr stellen"
@@ -85,6 +117,18 @@
       },
       "dhw_setpoint": {
         "name": "Warmwasser-Sollwert"
+      },
+      "sleep_timer": {
+        "name": "Sleep-Timer"
+      },
+      "chrono_t1": {
+        "name": "Chrono T1"
+      },
+      "chrono_t2": {
+        "name": "Chrono T2"
+      },
+      "chrono_t3": {
+        "name": "Chrono T3"
       }
     },
     "select": {
@@ -136,6 +180,9 @@
       }
     },
     "switch": {
+      "active": {
+        "name": "Active"
+      },
       "auto_mode": {
         "name": "Auto-Modus"
       },

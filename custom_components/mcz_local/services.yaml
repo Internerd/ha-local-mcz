@@ -1,0 +1,19 @@
+set_chrono_day:
+  fields:
+    config_entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: mcz_local
+    day:
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 6
+          mode: box
+    periods:
+      required: true
+      example: '[{"from": "06:00", "to": "08:30", "level": 3}, {"from": "17:00", "to": "22:00", "level": 2}]'
+      selector:
+        object:

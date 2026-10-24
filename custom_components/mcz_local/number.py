@@ -11,20 +11,26 @@ from homeassistant.components.number import (
     NumberEntityDescription,
     NumberMode,
 )
-from homeassistant.const import UnitOfTemperature
+from homeassistant.const import EntityCategory, UnitOfTemperature, UnitOfTime
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
+from .const import DOMAIN
 from .coordinator import MczConfigEntry, MczCoordinator, StoveData
 from .entity import MczEntity
 from .protocol import (
+    CHRONO_TEMP_LIMITS,
     INFO_BUFFER_TARGET,
     INFO_DHW_TARGET,
+    INFO_SLEEP,
     INFO_TANK_TARGET,
     INFO_WATER_TARGET,
     PARAM_BUFFER_TARGET,
+    PARAM_CHRONO_T1,
     PARAM_DHW_TARGET,
     PARAM_POWER_LEVEL,
+    PARAM_SLEEP,
     PARAM_TANK_TARGET,
     PARAM_WATER_TARGET,
     PARAMS_BUFFER_MAX,
@@ -37,7 +43,11 @@ from .protocol import (
     PARAMS_WATER_MIN,
     POWER_LEVEL_MAX,
     POWER_LEVEL_MIN,
+    SLEEP_MAX_STEPS,
+    SLEEP_STEP_MINUTES,
     encode_temperature,
+    sleep_minutes,
+    sleep_steps,
 )
 
 PARALLEL_UPDATES = 1
@@ -96,7 +106,11 @@ async def async_setup_entry(
     """Set up number entities."""
     coordinator = entry.runtime_data
     params = coordinator.data.parameters
-    entities: list[NumberEntity] = [MczPowerLevel(coordinator)]
+    entities: list[NumberEntity] = [
+        MczPowerLevel(coordinator),
+        MczSleepTimer(coordinator),
+        *(MczChronoTemperature(coordinator, level) for level in range(1, 4)),
+    ]
     if params.is_hydro:
         for description in HYDRO_SETPOINTS:
             if limits := params.limits(*description.limit_indices):
@@ -155,4 +169,86 @@ class MczHydroSetpoint(MczEntity, NumberEntity):
         """Set the setpoint."""
         await self.coordinator.async_write(
             (self.entity_description.param_id, encode_temperature(value))
+        )
+
+
+class MczSleepTimer(MczEntity, NumberEntity):
+    """Switch the stove off after a delay (10-minute steps, 0 = off)."""
+
+    _attr_translation_key = "sleep_timer"
+    _attr_native_min_value = 0
+    _attr_native_max_value = (SLEEP_MAX_STEPS - 1) * SLEEP_STEP_MINUTES
+    _attr_native_step = SLEEP_STEP_MINUTES
+    _attr_native_unit_of_measurement = UnitOfTime.MINUTES
+    _attr_mode = NumberMode.BOX
+
+    def __init__(self, coordinator: MczCoordinator) -> None:
+        """Initialize the sleep timer."""
+        super().__init__(coordinator, "sleep_timer")
+
+    @property
+    def native_value(self) -> int | None:
+        """Return the remaining time; 0 when the timer is off."""
+        return sleep_minutes(self.coordinator.data.info.get(INFO_SLEEP))
+
+    async def async_set_native_value(self, value: float) -> None:
+        """Start (or with 0 cancel) the sleep timer."""
+        await self.coordinator.async_write((PARAM_SLEEP, sleep_steps(value)))
+
+
+class MczChronoTemperature(MczEntity, NumberEntity):
+    """Chrono program temperature T1, T2 or T3 (whole °C)."""
+
+    _attr_device_class = NumberDeviceClass.TEMPERATURE
+    _attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
+    _attr_native_step = 1
+    _attr_mode = NumberMode.BOX
+    _attr_entity_category = EntityCategory.CONFIG
+
+    def __init__(self, coordinator: MczCoordinator, level: int) -> None:
+        """Initialize T<level>."""
+        super().__init__(coordinator, f"chrono_t{level}")
+        self._index = level - 1
+        self._attr_translation_key = f"chrono_t{level}"
+        self._attr_native_min_value, self._attr_native_max_value = CHRONO_TEMP_LIMITS[
+            self._index
+        ]
+
+    @property
+    def available(self) -> bool:
+        """Only available once the schedule has been read."""
+        return super().available and self.coordinator.data.chrono is not None
+
+    @property
+    def native_value(self) -> int | None:
+        """Return the program temperature."""
+        chrono = self.coordinator.data.chrono
+        return chrono.temperatures[self._index] if chrono else None
+
+    async def async_set_native_value(self, value: float) -> None:
+        """Set the program temperature, keeping it between its neighbours.
+
+        Only the changed value is checked: stoves can already hold equal
+        neighbours (e.g. T1 = T2), which must not block other changes.
+        """
+        chrono = self.coordinator.data.chrono
+        assert chrono is not None
+        temperatures = list(chrono.temperatures)
+        temperatures[self._index] = int(value)
+        below = temperatures[self._index - 1] if self._index > 0 else None
+        above = temperatures[self._index + 1] if self._index < 2 else None
+        if (below is not None and not below < value) or (
+            above is not None and not value < above
+        ):
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="chrono_order",
+                translation_placeholders={
+                    "t1": str(temperatures[0]),
+                    "t2": str(temperatures[1]),
+                    "t3": str(temperatures[2]),
+                },
+            )
+        await self.coordinator.async_write(
+            (PARAM_CHRONO_T1 + self._index, int(value)), refresh_chrono=True
         )

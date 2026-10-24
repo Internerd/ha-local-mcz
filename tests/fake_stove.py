@@ -25,6 +25,7 @@ def info_frame(**overrides: int) -> str:
         36: 7200,  # 2 h total
         44: 42,  # ignitions
         46: 10,  # pellet sensor on
+        49: 4,  # sleep: 30 minutes left
         50: 1,  # summer mode
         25: 36,  # target 18 °C
         27: 70,  # board 35 °C
@@ -58,6 +59,10 @@ VERSIONS_FRAME = (
     "0000000000000|010b01|5445303620202020|05|MCZ-0000TEST0001|00|1.0.0"
     "|0A1B2C3D4E5F|1.0.0|1.0|N.C.|115200|115200"
 )
+# Day 0: all T1; day 1: T3 from 08:00 to 17:00; T1/T2/T3 = 9/9/18 °C.
+CHRONO_FRAME = "|".join(
+    ["5" * 24, "55555555fffffffff5555555", *["0" * 24] * 5, "09", "09", "12"]
+)
 # Ring buffer: newest entry (A02, 2026-03-13) is not the first slot.
 ALARMS_FRAME = "32|69a118c3|33|69b39182|ff|ffffffff|32|699ac8f6"
 
@@ -72,6 +77,7 @@ class FakeStove:
         self.send_ping = False
         self.versions: str | None = VERSIONS_FRAME
         self.alarms = ALARMS_FRAME
+        self.chrono = CHRONO_FRAME
         self.sockets: list[web.WebSocketResponse] = []
         self.app = web.Application()
         self.app.router.add_get("/", self._handler)
@@ -94,6 +100,13 @@ class FakeStove:
                 await ws.send_str(f"0E|{self.versions}")
             elif msg.data == "C|RecuperaAllarmi":
                 await ws.send_str(f"0A|{self.alarms}")
+            elif msg.data == "C|RecuperoGiornoChrono":
+                await ws.send_str(f"04|{self.chrono}")
+            elif msg.data.startswith("C|ScriviGiornoChrono|"):
+                _, _, day, value = msg.data.split("|")
+                days = self.chrono.split("|")
+                days[int(day)] = value
+                self.chrono = "|".join(days)
         return ws
 
     async def close(self) -> None:

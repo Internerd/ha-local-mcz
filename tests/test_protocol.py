@@ -157,3 +157,57 @@ def test_brazier_key() -> None:
     assert p.brazier_key(101) == "opening"
     assert p.brazier_key(0xFF) is None
     assert p.brazier_key(None) is None
+
+
+def test_chrono_roundtrip() -> None:
+    """Decode and encode are inverse; 2 bits per slot, MSB first."""
+    from .fake_stove import CHRONO_FRAME
+
+    chrono = p.parse_chrono(CHRONO_FRAME)
+    assert chrono.temperatures == (9, 9, 18)
+    assert chrono.days[0] == (1,) * 48
+    # 'fd' = 11 11 11 01
+    assert p.decode_chrono_day("fd" + "00" * 11)[:5] == (3, 3, 3, 1, 0)
+    for day in chrono.days:
+        assert p.decode_chrono_day(p.encode_chrono_day(day)) == day
+    assert p.encode_chrono_day(chrono.days[1]) == "55555555fffffffff5555555"
+
+
+def test_chrono_periods() -> None:
+    """Consecutive slots are grouped; off slots are left out."""
+    from .fake_stove import CHRONO_FRAME
+
+    chrono = p.parse_chrono(CHRONO_FRAME)
+    assert p.chrono_periods(chrono.days[0]) == [
+        {"from": "00:00", "to": "24:00", "level": 1}
+    ]
+    assert p.chrono_periods(chrono.days[1]) == [
+        {"from": "00:00", "to": "08:00", "level": 1},
+        {"from": "08:00", "to": "17:00", "level": 3},
+        {"from": "17:00", "to": "24:00", "level": 1},
+    ]
+    assert p.chrono_periods(chrono.days[2]) == []
+
+
+def test_chrono_invalid() -> None:
+    """Malformed chrono data is rejected."""
+    with pytest.raises(p.ProtocolError):
+        p.parse_chrono("55|09")
+    with pytest.raises(p.ProtocolError):
+        p.decode_chrono_day("zz" * 12)
+    with pytest.raises(ValueError):
+        p.encode_chrono_day([4] * 48)
+    with pytest.raises(ValueError):
+        p.write_chrono_day(7, [0] * 48)
+
+
+def test_sleep_conversion() -> None:
+    """One step is 10 minutes; the stove shows now + (n - 1) * 10 min."""
+    assert p.sleep_minutes(0) == 0
+    assert p.sleep_minutes(1) == 0
+    assert p.sleep_minutes(4) == 30
+    assert p.sleep_minutes(None) is None
+    assert p.sleep_steps(0) == 0
+    assert p.sleep_steps(30) == 4
+    assert p.sleep_steps(480) == 49
+    assert p.sleep_steps(9999) == 49
