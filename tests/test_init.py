@@ -18,7 +18,9 @@ from homeassistant.components.select import (
 )
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
+import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from .fake_stove import FakeStove, info_frame
@@ -47,7 +49,7 @@ async def test_setup_air_stove(
     await _setup(hass, config_entry)
     assert config_entry.state is ConfigEntryState.LOADED
 
-    climate = hass.states.get("climate.mcz_maestro_127_0_0_1")
+    climate = hass.states.get("climate.mcz_maestro")
     assert climate is not None
     assert climate.state == "heat"
     assert climate.attributes["current_temperature"] == 18.5
@@ -55,17 +57,13 @@ async def test_setup_air_stove(
     assert climate.attributes["target_temp_step"] == 0.5
     assert climate.attributes[ATTR_HVAC_ACTION] == HVACAction.IDLE
 
-    assert hass.states.get("sensor.mcz_maestro_127_0_0_1_state").state == "standby"
-    assert (
-        hass.states.get("sensor.mcz_maestro_127_0_0_1_adaptive_mode").state == "dynamic"
-    )
-    assert hass.states.get("number.mcz_maestro_127_0_0_1_power_level").state == "3"
-    assert hass.states.get("select.mcz_maestro_127_0_0_1_front_fan").state == "auto"
-    assert hass.states.get("select.mcz_maestro_127_0_0_1_ducted_fan_1") is None
-    assert (
-        hass.states.get("sensor.mcz_maestro_127_0_0_1_buffer_tank_temperature") is None
-    )
-    assert hass.states.get("binary_sensor.mcz_maestro_127_0_0_1_alarm").state == "off"
+    assert hass.states.get("sensor.mcz_maestro_state").state == "standby"
+    assert hass.states.get("sensor.mcz_maestro_adaptive_mode").state == "dynamic"
+    assert hass.states.get("number.mcz_maestro_power_level").state == "3"
+    assert hass.states.get("select.mcz_maestro_front_fan").state == "auto"
+    assert hass.states.get("select.mcz_maestro_ducted_fan_1") is None
+    assert hass.states.get("sensor.mcz_maestro_buffer_tank_temperature") is None
+    assert hass.states.get("binary_sensor.mcz_maestro_alarm").state == "off"
 
     assert await hass.config_entries.async_unload(config_entry.entry_id)
     assert config_entry.state is ConfigEntryState.NOT_LOADED
@@ -83,14 +81,8 @@ async def test_hydro_entities(
     stove.params = params_frame(hydro=True)
     stove.info = info_frame(i6=0x50, i7=0xFF)
     await _setup(hass, config_entry)
-    assert (
-        hass.states.get("sensor.mcz_maestro_127_0_0_1_buffer_tank_temperature").state
-        == "40.0"
-    )
-    assert (
-        hass.states.get("sensor.mcz_maestro_127_0_0_1_water_temperature").state
-        == "unknown"
-    )
+    assert hass.states.get("sensor.mcz_maestro_buffer_tank_temperature").state == "40.0"
+    assert hass.states.get("sensor.mcz_maestro_water_temperature").state == "unknown"
 
 
 async def test_commands(
@@ -105,7 +97,7 @@ async def test_commands(
     await hass.services.async_call(
         CLIMATE_DOMAIN,
         SERVICE_SET_TEMPERATURE,
-        {"entity_id": "climate.mcz_maestro_127_0_0_1", "temperature": 21.5},
+        {"entity_id": "climate.mcz_maestro", "temperature": 21.5},
         blocking=True,
     )
     await _wait_for(stove, "C|WriteParametri|42|43")
@@ -113,7 +105,7 @@ async def test_commands(
     await hass.services.async_call(
         CLIMATE_DOMAIN,
         SERVICE_TURN_OFF,
-        {"entity_id": "climate.mcz_maestro_127_0_0_1"},
+        {"entity_id": "climate.mcz_maestro"},
         blocking=True,
     )
     await _wait_for(stove, "C|WriteParametri|34|40")
@@ -121,7 +113,7 @@ async def test_commands(
     await hass.services.async_call(
         NUMBER_DOMAIN,
         SERVICE_SET_VALUE,
-        {"entity_id": "number.mcz_maestro_127_0_0_1_power_level", "value": 5},
+        {"entity_id": "number.mcz_maestro_power_level", "value": 5},
         blocking=True,
     )
     await _wait_for(stove, "C|WriteParametri|36|5")
@@ -129,7 +121,7 @@ async def test_commands(
     await hass.services.async_call(
         SELECT_DOMAIN,
         SERVICE_SELECT_OPTION,
-        {"entity_id": "select.mcz_maestro_127_0_0_1_front_fan", "option": "off"},
+        {"entity_id": "select.mcz_maestro_front_fan", "option": "off"},
         blocking=True,
     )
     await _wait_for(stove, "C|WriteParametri|37|0")
@@ -137,7 +129,7 @@ async def test_commands(
     await hass.services.async_call(
         "button",
         "press",
-        {"entity_id": "button.mcz_maestro_127_0_0_1_reset_alarm"},
+        {"entity_id": "button.mcz_maestro_reset_alarm"},
         blocking=True,
     )
     await _wait_for(stove, "C|WriteParametri|1|255")
@@ -165,3 +157,53 @@ async def test_setup_retry_when_unreachable(
     entry.add_to_hass(hass)
     await hass.config_entries.async_setup(entry.entry_id)
     assert entry.state is ConfigEntryState.SETUP_RETRY
+
+
+async def test_reconnect_after_stove_drops_connection(
+    hass: HomeAssistant,
+    fake_stove: tuple[FakeStove, int],
+    config_entry: MockConfigEntry,
+) -> None:
+    """When the stove closes the socket the next poll reconnects."""
+    stove, _ = fake_stove
+    await _setup(hass, config_entry)
+    await stove.close()
+    coordinator = config_entry.runtime_data
+    async with asyncio.timeout(5):
+        while coordinator.client.connected:
+            await asyncio.sleep(0.01)
+    stove.received.clear()
+    await coordinator.async_refresh()
+    assert coordinator.last_update_success
+    assert stove.received[:2] == ["C|RecuperoParametri", "C|RecuperoInfo"]
+
+
+async def test_write_error_is_translated(
+    hass: HomeAssistant,
+    fake_stove: tuple[FakeStove, int],
+    config_entry: MockConfigEntry,
+) -> None:
+    """A failed write surfaces as a translated HomeAssistantError."""
+    await _setup(hass, config_entry)
+    coordinator = config_entry.runtime_data
+    await coordinator.client.close()
+    with pytest.raises(HomeAssistantError) as err:
+        await hass.services.async_call(
+            "button",
+            "press",
+            {"entity_id": "button.mcz_maestro_reset_alarm"},
+            blocking=True,
+        )
+    assert err.value.translation_key == "write_failed"
+
+
+async def test_power_level_out_of_range(
+    hass: HomeAssistant,
+    fake_stove: tuple[FakeStove, int],
+    config_entry: MockConfigEntry,
+) -> None:
+    """A raw power level outside 11..15 is shown as unknown."""
+    stove, _ = fake_stove
+    stove.info = info_frame(i28=0)
+    await _setup(hass, config_entry)
+    assert hass.states.get("number.mcz_maestro_power_level").state == "unknown"

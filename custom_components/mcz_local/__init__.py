@@ -41,5 +41,5 @@ async def async_unload_entry(hass: HomeAssistant, entry: MczConfigEntry) -> bool
     """Unload a config entry."""
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unloaded:
-        await entry.runtime_data.client.disconnect()
+        await entry.runtime_data.client.close()
     return unloaded

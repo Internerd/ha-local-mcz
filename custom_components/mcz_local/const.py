@@ -15,6 +15,7 @@ MAX_SCAN_INTERVAL: Final = 300
 CONF_SCAN_INTERVAL: Final = "scan_interval"
 
 MANUFACTURER: Final = "MCZ"
+DEFAULT_TITLE: Final = "MCZ Maestro"
 
 
 def scan_interval(seconds: int) -> timedelta:

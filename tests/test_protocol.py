@@ -97,3 +97,11 @@ def test_adaptive_mode() -> None:
     assert p.adaptive_mode_key(1) == "dynamic"
     assert p.adaptive_mode_key(11) == "dynamic"
     assert p.adaptive_mode_key(99) is None
+
+
+def test_ipv6_url() -> None:
+    """IPv6 hosts are put in brackets."""
+    from custom_components.mcz_local.client import MczClient
+
+    client = MczClient(None, "fe80::1", 81)  # type: ignore[arg-type]
+    assert str(client._url) == "ws://[fe80::1]:81/"

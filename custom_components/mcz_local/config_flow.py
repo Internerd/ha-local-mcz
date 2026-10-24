@@ -11,7 +11,7 @@ from homeassistant.config_entries import (
     OptionsFlowWithReload,
 )
 from homeassistant.const import CONF_HOST, CONF_PORT
-from homeassistant.core import callback
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 import voluptuous as vol
 
@@ -20,6 +20,7 @@ from .const import (
     CONF_SCAN_INTERVAL,
     DEFAULT_PORT,
     DEFAULT_SCAN_INTERVAL,
+    DEFAULT_TITLE,
     DOMAIN,
     MAX_SCAN_INTERVAL,
     MIN_SCAN_INTERVAL,
@@ -38,6 +39,25 @@ STEP_USER_SCHEMA = vol.Schema(
 )
 
 
+async def _async_validate(hass: HomeAssistant, host: str, port: int) -> str | None:
+    """Return an error key, or None if the stove answered."""
+    client = MczClient(async_get_clientsession(hass), host, port)
+    try:
+        await client.connect()
+    except MczConnectionError:
+        return "cannot_connect"
+    except Exception:
+        _LOGGER.exception("Unexpected error while connecting")
+        return "unknown"
+    finally:
+        await client.close()
+    return None
+
+
+def _clean(user_input: dict[str, Any]) -> dict[str, Any]:
+    return {CONF_HOST: user_input[CONF_HOST].strip(), CONF_PORT: user_input[CONF_PORT]}
+
+
 class MczConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow."""
 
@@ -49,30 +69,42 @@ class MczConfigFlow(ConfigFlow, domain=DOMAIN):
         """Ask for host and port and check that the stove answers."""
         errors: dict[str, str] = {}
         if user_input is not None:
-            host = user_input[CONF_HOST].strip()
-            port = user_input[CONF_PORT]
-            await self.async_set_unique_id(f"{host}:{port}")
+            data = _clean(user_input)
+            await self.async_set_unique_id(f"{data[CONF_HOST]}:{data[CONF_PORT]}")
             self._abort_if_unique_id_configured()
-            client = MczClient(async_get_clientsession(self.hass), host, port)
-            try:
-                await client.connect()
-            except MczConnectionError:
-                errors["base"] = "cannot_connect"
-            except Exception:
-                _LOGGER.exception("Unexpected error while connecting")
-                errors["base"] = "unknown"
-            else:
-                return self.async_create_entry(
-                    title=f"MCZ Maestro ({host})",
-                    data={CONF_HOST: host, CONF_PORT: port},
-                )
-            finally:
-                await client.disconnect()
+            if not (error := await _async_validate(self.hass, **data)):
+                return self.async_create_entry(title=DEFAULT_TITLE, data=data)
+            errors["base"] = error
 
         return self.async_show_form(
             step_id="user",
             data_schema=self.add_suggested_values_to_schema(
                 STEP_USER_SCHEMA, user_input
+            ),
+            errors=errors,
+        )
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Change host or port of an existing stove, e.g. after an IP change."""
+        entry = self._get_reconfigure_entry()
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            data = _clean(user_input)
+            await self.async_set_unique_id(f"{data[CONF_HOST]}:{data[CONF_PORT]}")
+            if self.unique_id != entry.unique_id:
+                self._abort_if_unique_id_configured()
+            if not (error := await _async_validate(self.hass, **data)):
+                return self.async_update_reload_and_abort(
+                    entry, unique_id=self.unique_id, data_updates=data
+                )
+            errors["base"] = error
+
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=self.add_suggested_values_to_schema(
+                STEP_USER_SCHEMA, user_input or entry.data
             ),
             errors=errors,
         )

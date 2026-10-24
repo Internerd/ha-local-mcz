@@ -8,6 +8,7 @@ import contextlib
 import logging
 
 import aiohttp
+from yarl import URL
 
 from .protocol import (
     CMD_GET_INFO,
@@ -42,7 +43,8 @@ class MczClient:
     def __init__(self, session: aiohttp.ClientSession, host: str, port: int) -> None:
         """Initialize the client."""
         self._session = session
-        self._url = f"ws://{host}:{port}/"
+        self._url = URL.build(scheme="ws", host=host, port=port, path="/")
+        self._closed = False
         self._ws: aiohttp.ClientWebSocketResponse | None = None
         self._reader: asyncio.Task[None] | None = None
         self._send_lock = asyncio.Lock()
@@ -58,6 +60,8 @@ class MczClient:
 
     async def connect(self) -> None:
         """Open the WebSocket and load the stove configuration."""
+        if self._closed:
+            raise MczConnectionError("Client is closed")
         if self.connected:
             return
         try:
@@ -79,6 +83,11 @@ class MczClient:
             with contextlib.suppress(asyncio.CancelledError):
                 await reader
         self._fail_waiters(MczConnectionError("Disconnected"))
+
+    async def close(self) -> None:
+        """Disconnect for good; later connect() calls fail."""
+        self._closed = True
+        await self.disconnect()
 
     async def fetch_parameters(self) -> StoveParameters:
         """Request the configuration block (``00``)."""
@@ -137,9 +146,10 @@ class MczClient:
         except (aiohttp.ClientError, ConnectionError) as err:
             _LOGGER.debug("Read loop ended: %s", err)
         finally:
+            # Only touch shared state if no newer connection replaced this one.
             if self._ws is ws:
                 self._ws = None
-            self._fail_waiters(MczConnectionError("Connection closed"))
+                self._fail_waiters(MczConnectionError("Connection closed"))
 
     async def _handle_frame(self, frame: str) -> None:
         _LOGGER.debug("Received %s", frame)

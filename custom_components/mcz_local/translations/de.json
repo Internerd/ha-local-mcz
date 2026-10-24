@@ -11,6 +11,17 @@
         "data_description": {
           "host": "IP-Adresse oder Hostname des Ofens. Eine feste IP / DHCP-Reservierung wird empfohlen."
         }
+      },
+      "reconfigure": {
+        "title": "Verbindung ändern",
+        "description": "IP-Adresse oder Port des Ofens ändern.",
+        "data": {
+          "host": "Host",
+          "port": "Port"
+        },
+        "data_description": {
+          "host": "IP-Adresse oder Hostname des Ofens. Eine feste IP / DHCP-Reservierung wird empfohlen."
+        }
       }
     },
     "error": {
@@ -18,7 +29,8 @@
       "unknown": "Unerwarteter Fehler, siehe Log."
     },
     "abort": {
-      "already_configured": "Dieser Ofen ist bereits eingerichtet."
+      "already_configured": "Dieser Ofen ist bereits eingerichtet.",
+      "reconfigure_successful": "Die Verbindung wurde aktualisiert."
     }
   },
   "options": {
@@ -29,6 +41,11 @@
           "scan_interval": "Abfrageintervall (Sekunden)"
         }
       }
+    }
+  },
+  "exceptions": {
+    "write_failed": {
+      "message": "Der Befehl konnte nicht an den Ofen gesendet werden: {error}"
     }
   },
   "entity": {

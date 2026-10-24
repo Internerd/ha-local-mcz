@@ -56,6 +56,9 @@ Home Assistant configuration, then restart Home Assistant.
 | Port | 81 | WebSocket port |
 | Polling interval | 5 s | Under **Configure**, 3–300 seconds |
 
+If the IP address of the stove changes, open the integration's menu (⋮) and
+choose **Reconfigure**. You don't need to remove and re-add it.
+
 ## Safety
 
 This software sends commands to a heating appliance. Always follow the

@@ -5,6 +5,7 @@ from __future__ import annotations
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.mcz_local.const import DOMAIN
 
@@ -50,3 +51,48 @@ async def test_options_flow(hass: HomeAssistant, fake_stove, config_entry) -> No
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert config_entry.options == {"scan_interval": 10}
+
+
+async def test_user_flow_duplicate(
+    hass: HomeAssistant, fake_stove: tuple[FakeStove, int], config_entry
+) -> None:
+    """The same host and port can only be added once."""
+    config_entry.add_to_hass(hass)
+    _, port = fake_stove
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"host": " 127.0.0.1 ", "port": port}
+    )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
+
+
+async def test_reconfigure(
+    hass: HomeAssistant, fake_stove: tuple[FakeStove, int], socket_enabled
+) -> None:
+    """A changed IP address can be entered without removing the entry."""
+    _, port = fake_stove
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="MCZ Maestro",
+        unique_id="10.0.0.99:81",
+        data={"host": "10.0.0.99", "port": 81},
+    )
+    entry.add_to_hass(hass)
+    result = await entry.start_reconfigure_flow(hass)
+    assert result["type"] is FlowResultType.FORM
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"host": "127.0.0.1", "port": 1}
+    )
+    assert result["errors"] == {"base": "cannot_connect"}
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"host": "127.0.0.1", "port": port}
+    )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.data == {"host": "127.0.0.1", "port": port}
+    assert entry.unique_id == f"127.0.0.1:{port}"

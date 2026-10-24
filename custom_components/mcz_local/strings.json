@@ -11,6 +11,17 @@
         "data_description": {
           "host": "IP address or hostname of the stove. A fixed IP / DHCP reservation is recommended."
         }
+      },
+      "reconfigure": {
+        "title": "Change connection",
+        "description": "Change the IP address or port of the stove.",
+        "data": {
+          "host": "Host",
+          "port": "Port"
+        },
+        "data_description": {
+          "host": "IP address or hostname of the stove. A fixed IP / DHCP reservation is recommended."
+        }
       }
     },
     "error": {
@@ -18,7 +29,8 @@
       "unknown": "Unexpected error, see the log."
     },
     "abort": {
-      "already_configured": "This stove is already configured."
+      "already_configured": "This stove is already configured.",
+      "reconfigure_successful": "The connection was updated."
     }
   },
   "options": {
@@ -29,6 +41,11 @@
           "scan_interval": "Polling interval (seconds)"
         }
       }
+    }
+  },
+  "exceptions": {
+    "write_failed": {
+      "message": "Sending the command to the stove failed: {error}"
     }
   },
   "entity": {

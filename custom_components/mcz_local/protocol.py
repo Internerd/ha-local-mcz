@@ -232,7 +232,7 @@ class StoveInfo:
     def power_level(self) -> int | None:
         """Return the configured power level (1..5)."""
         value = self.get(INFO_POWER_LEVEL)
-        if value is None:
+        if value is None or not POWER_LEVEL_MIN <= value - 10 <= POWER_LEVEL_MAX:
             return None
         return value - 10
 

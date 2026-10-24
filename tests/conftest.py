@@ -35,7 +35,7 @@ def config_entry(fake_stove: tuple[FakeStove, int]) -> MockConfigEntry:
     _, port = fake_stove
     return MockConfigEntry(
         domain=DOMAIN,
-        title="MCZ Maestro (127.0.0.1)",
+        title="MCZ Maestro",
         unique_id=f"127.0.0.1:{port}",
         data={"host": "127.0.0.1", "port": port},
     )

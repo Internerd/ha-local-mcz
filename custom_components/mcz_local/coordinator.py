@@ -69,6 +69,8 @@ class MczCoordinator(DataUpdateCoordinator[StoveData]):
         except MczConnectionError as err:
             await self.client.disconnect()
             raise HomeAssistantError(
-                f"Writing parameter {param_id} failed: {err}"
+                translation_domain=DOMAIN,
+                translation_key="write_failed",
+                translation_placeholders={"error": str(err)},
             ) from err
         await self.async_request_refresh()
