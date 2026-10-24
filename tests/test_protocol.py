@@ -211,3 +211,9 @@ def test_sleep_conversion() -> None:
     assert p.sleep_steps(30) == 4
     assert p.sleep_steps(480) == 49
     assert p.sleep_steps(9999) == 49
+
+
+def test_chrono_weekdays() -> None:
+    """Day 0 is Sunday, day 6 Saturday (checked on a real stove)."""
+    assert p.CHRONO_DAY_KEYS[0] == "sunday"
+    assert p.CHRONO_DAY_KEYS[6] == "saturday"

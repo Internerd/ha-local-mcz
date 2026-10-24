@@ -12,7 +12,7 @@ import voluptuous as vol
 
 from .const import DOMAIN
 from .coordinator import MczConfigEntry
-from .protocol import CHRONO_DAYS, CHRONO_LEVELS, CHRONO_SLOTS
+from .protocol import CHRONO_DAY_KEYS, CHRONO_LEVELS, CHRONO_SLOTS
 
 SERVICE_SET_CHRONO_DAY = "set_chrono_day"
 ATTR_CONFIG_ENTRY_ID = "config_entry_id"
@@ -42,7 +42,7 @@ PERIOD_SCHEMA = vol.Schema(
 SET_CHRONO_DAY_SCHEMA = vol.Schema(
     {
         vol.Required(ATTR_CONFIG_ENTRY_ID): cv.string,
-        vol.Required(ATTR_DAY): vol.All(vol.Coerce(int), vol.Range(0, CHRONO_DAYS - 1)),
+        vol.Required(ATTR_DAY): vol.In(CHRONO_DAY_KEYS),
         vol.Required(ATTR_PERIODS): vol.All(cv.ensure_list, [PERIOD_SCHEMA]),
     }
 )
@@ -86,7 +86,9 @@ def async_setup_services(hass: HomeAssistant) -> None:
                 translation_key="invalid_periods",
                 translation_placeholders={"error": str(err)},
             ) from err
-        await entry.runtime_data.async_write_chrono_day(call.data[ATTR_DAY], slots)
+        await entry.runtime_data.async_write_chrono_day(
+            CHRONO_DAY_KEYS.index(call.data[ATTR_DAY]), slots
+        )
 
     hass.services.async_register(
         DOMAIN, SERVICE_SET_CHRONO_DAY, set_chrono_day, schema=SET_CHRONO_DAY_SCHEMA

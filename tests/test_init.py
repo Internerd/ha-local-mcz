@@ -355,7 +355,11 @@ async def test_chrono_sleep_active(
     assert hass.states.get("number.mcz_maestro_chrono_t3").state == "18"
     chrono = hass.states.get("switch.mcz_maestro_chrono_schedule")
     assert chrono.attributes["t1"] == 9
-    assert chrono.attributes["day_1"][1] == {"from": "08:00", "to": "17:00", "level": 3}
+    assert chrono.attributes["monday"][1] == {
+        "from": "08:00",
+        "to": "17:00",
+        "level": 3,
+    }
     assert hass.states.get("number.mcz_maestro_sleep_timer").state == "30"
     assert hass.states.get("switch.mcz_maestro_active").state == "off"
 
@@ -413,7 +417,7 @@ async def test_set_chrono_day_service(
         "set_chrono_day",
         {
             "config_entry_id": config_entry.entry_id,
-            "day": 2,
+            "day": "tuesday",
             "periods": [
                 {"from": "06:00", "to": "08:30", "level": 3},
                 {"from": "22:00", "to": "00:00", "level": 1},
@@ -431,7 +435,7 @@ async def test_set_chrono_day_service(
     await _wait_for(stove, frame)
     await hass.async_block_till_done()
     assert hass.states.get("switch.mcz_maestro_chrono_schedule").attributes[
-        "day_2"
+        "tuesday"
     ] == [
         {"from": "06:00", "to": "08:30", "level": 3},
         {"from": "22:00", "to": "24:00", "level": 1},
@@ -443,7 +447,7 @@ async def test_set_chrono_day_service(
             "set_chrono_day",
             {
                 "config_entry_id": config_entry.entry_id,
-                "day": 2,
+                "day": "tuesday",
                 "periods": [{"from": "09:00", "to": "08:00", "level": 1}],
             },
             blocking=True,
@@ -454,7 +458,7 @@ async def test_set_chrono_day_service(
             "set_chrono_day",
             {
                 "config_entry_id": config_entry.entry_id,
-                "day": 2,
+                "day": "tuesday",
                 "periods": [{"from": "09:15", "to": "10:00", "level": 1}],
             },
             blocking=True,

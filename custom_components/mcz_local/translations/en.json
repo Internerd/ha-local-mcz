@@ -57,6 +57,19 @@
       "message": "Invalid schedule: {error}"
     }
   },
+  "selector": {
+    "weekday": {
+      "options": {
+        "monday": "Monday",
+        "tuesday": "Tuesday",
+        "wednesday": "Wednesday",
+        "thursday": "Thursday",
+        "friday": "Friday",
+        "saturday": "Saturday",
+        "sunday": "Sunday"
+      }
+    }
+  },
   "services": {
     "set_chrono_day": {
       "name": "Set chrono day",
@@ -68,7 +81,7 @@
         },
         "day": {
           "name": "Day",
-          "description": "Day index 0-6 as used by the stove."
+          "description": "Weekday to program."
         },
         "periods": {
           "name": "Periods",

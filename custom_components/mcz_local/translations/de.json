@@ -57,6 +57,19 @@
       "message": "Ungültiger Zeitplan: {error}"
     }
   },
+  "selector": {
+    "weekday": {
+      "options": {
+        "monday": "Montag",
+        "tuesday": "Dienstag",
+        "wednesday": "Mittwoch",
+        "thursday": "Donnerstag",
+        "friday": "Freitag",
+        "saturday": "Samstag",
+        "sunday": "Sonntag"
+      }
+    }
+  },
   "services": {
     "set_chrono_day": {
       "name": "Chrono-Tag setzen",
@@ -68,7 +81,7 @@
         },
         "day": {
           "name": "Tag",
-          "description": "Tagesindex 0-6, wie ihn der Ofen verwendet."
+          "description": "Wochentag, der programmiert wird."
         },
         "periods": {
           "name": "Zeiträume",

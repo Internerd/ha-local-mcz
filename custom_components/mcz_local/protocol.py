@@ -230,6 +230,16 @@ SLEEP_MAX_STEPS = 49
 
 # Chrono: 7 days x 48 half-hour slots, 2 bits each (0 = off, 1..3 = T1..T3).
 CHRONO_DAYS = 7
+# Day index used by the stove; 0 = Sunday (verified on a real stove).
+CHRONO_DAY_KEYS = (
+    "sunday",
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+)
 CHRONO_SLOTS = 48
 CHRONO_LEVELS = 3
 # (min, max) in whole °C for T1, T2, T3; T1 < T2 < T3.

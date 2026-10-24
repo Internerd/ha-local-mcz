@@ -8,10 +8,16 @@ set_chrono_day:
     day:
       required: true
       selector:
-        number:
-          min: 0
-          max: 6
-          mode: box
+        select:
+          translation_key: weekday
+          options:
+            - monday
+            - tuesday
+            - wednesday
+            - thursday
+            - friday
+            - saturday
+            - sunday
     periods:
       required: true
       example: '[{"from": "06:00", "to": "08:30", "level": 3}, {"from": "17:00", "to": "22:00", "level": 2}]'

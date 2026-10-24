@@ -31,7 +31,7 @@ The device page shows the serial number, MAC address and firmware of the stove.
 ### Chrono schedule
 
 The **Chrono** switch turns the weekly program on and off. Its attributes show
-T1–T3 and, for each day (`day_0` … `day_6`, numbered as the stove does), the
+T1–T3 and, for each weekday (`monday` … `sunday`), the
 periods with their level (1–3 = T1–T3). Times without a period are off.
 
 To change a day, use the action `mcz_local.set_chrono_day`. It replaces the
@@ -41,7 +41,7 @@ whole day:
 action: mcz_local.set_chrono_day
 data:
   config_entry_id: <your stove>
-  day: 1
+  day: monday
   periods:
     - {from: "06:00", to: "08:30", level: 3}
     - {from: "17:00", to: "00:00", level: 2}  # 00:00 as end = midnight

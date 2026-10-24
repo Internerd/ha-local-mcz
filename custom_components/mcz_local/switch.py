@@ -13,7 +13,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from .coordinator import MczConfigEntry, MczCoordinator
 from .entity import MczEntity
 from .protocol import (
-    CHRONO_DAYS,
+    CHRONO_DAY_KEYS,
     INFO_ACTIVE,
     INFO_ANTIFREEZE,
     INFO_CHRONO,
@@ -155,12 +155,12 @@ class MczChronoSwitch(MczSwitch):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
-        """Return T1..T3 and the periods of each day (0..6)."""
+        """Return T1..T3 and the periods of each weekday."""
         chrono = self.coordinator.data.chrono
         if chrono is None:
             return None
         t1, t2, t3 = chrono.temperatures
         attributes: dict[str, Any] = {"t1": t1, "t2": t2, "t3": t3}
-        for day in range(CHRONO_DAYS):
-            attributes[f"day_{day}"] = chrono_periods(chrono.days[day])
+        for day, key in enumerate(CHRONO_DAY_KEYS):
+            attributes[key] = chrono_periods(chrono.days[day])
         return attributes
