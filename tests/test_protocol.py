@@ -149,3 +149,11 @@ def test_limits() -> None:
     params = p.parse_parameters(params_frame())
     assert params.limits(p.PARAMS_ROOM_MIN, p.PARAMS_ROOM_MAX) == (5, 35)
     assert params.limits(p.PARAMS_BUFFER_MIN, p.PARAMS_BUFFER_MAX) is None
+
+
+def test_brazier_key() -> None:
+    """Only the documented brazier codes have a meaning."""
+    assert p.brazier_key(0) == "ok"
+    assert p.brazier_key(101) == "opening"
+    assert p.brazier_key(0xFF) is None
+    assert p.brazier_key(None) is None

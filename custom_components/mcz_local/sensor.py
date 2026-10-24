@@ -25,11 +25,14 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from .coordinator import MczConfigEntry, MczCoordinator, StoveData
 from .entity import MczEntity
 from .protocol import (
+    BRAZIER_KEYS,
+    BRAZIER_NOT_PRESENT,
     INFO_ACTIVE_TEMP,
     INFO_ACTIVE_VALUE,
     INFO_AUGER_RPM,
     INFO_AUGER_RPM_TARGET,
     INFO_BOARD_TEMP,
+    INFO_BRAZIER,
     INFO_BUFFER_TEMP,
     INFO_EXHAUST_FAN_RPM,
     INFO_EXHAUST_TEMP,
@@ -49,7 +52,7 @@ from .protocol import (
     INFO_WIFI_PROBE_3,
     STATE_OPTIONS,
     THREE_WAY_VALVE_KEYS,
-    StoveParameters,
+    brazier_key,
     state_key,
 )
 
@@ -61,7 +64,7 @@ class MczSensorDescription(SensorEntityDescription):
     """Describes an MCZ sensor."""
 
     value_fn: Callable[[StoveData], float | int | str | datetime | None]
-    exists_fn: Callable[[StoveParameters], bool] = lambda _: True
+    exists_fn: Callable[[StoveData], bool] = lambda _: True
 
 
 def _temperature(index: int) -> Callable[[StoveData], float | None]:
@@ -94,8 +97,12 @@ def _last_alarm_time(data: StoveData) -> datetime | None:
     return data.alarms[0].time if data.alarms else None
 
 
-def _hydro(params: StoveParameters) -> bool:
-    return params.is_hydro
+def _hydro(data: StoveData) -> bool:
+    return data.parameters.is_hydro
+
+
+def _brazier_present(data: StoveData) -> bool:
+    return data.info.get(INFO_BRAZIER) not in (None, BRAZIER_NOT_PRESENT)
 
 
 def _temperature_sensor(key: str, index: int, **kwargs) -> MczSensorDescription:
@@ -119,6 +126,14 @@ SENSORS: tuple[MczSensorDescription, ...] = (
         value_fn=lambda data: state_key(data.info.state),
     ),
     _temperature_sensor("room_temperature", INFO_ROOM_TEMP),
+    MczSensorDescription(
+        key="brazier",
+        translation_key="brazier",
+        device_class=SensorDeviceClass.ENUM,
+        options=list(BRAZIER_KEYS.values()),
+        value_fn=lambda data: brazier_key(data.info.get(INFO_BRAZIER)),
+        exists_fn=_brazier_present,
+    ),
     MczSensorDescription(
         key="exhaust_temperature",
         translation_key="exhaust_temperature",
@@ -264,11 +279,10 @@ async def async_setup_entry(
 ) -> None:
     """Set up sensors."""
     coordinator = entry.runtime_data
-    params = coordinator.data.parameters
     async_add_entities(
         MczSensor(coordinator, description)
         for description in SENSORS
-        if description.exists_fn(params)
+        if description.exists_fn(coordinator.data)
     )
 
 

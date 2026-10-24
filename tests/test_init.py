@@ -20,7 +20,7 @@ from homeassistant.components.select import (
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -28,7 +28,8 @@ from .fake_stove import FakeStove, info_frame
 
 
 async def _setup(hass: HomeAssistant, entry: MockConfigEntry) -> None:
-    entry.add_to_hass(hass)
+    if hass.config_entries.async_get_entry(entry.entry_id) is None:
+        entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
 
@@ -306,3 +307,36 @@ async def test_diagnostics_hide_serial(
     assert "MCZ-0000TEST0001" not in text
     assert "0A1B2C3D4E5F" not in text
     assert result["info"]["raw"].startswith("2e|")
+
+
+async def test_brazier_status(
+    hass: HomeAssistant,
+    fake_stove: tuple[FakeStove, int],
+    config_entry: MockConfigEntry,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """A motorised brazier reports its motor state; the old binary sensor goes."""
+    stove, _ = fake_stove
+    stove.info = info_frame(i16=100)
+    config_entry.add_to_hass(hass)
+    old = entity_registry.async_get_or_create(
+        "binary_sensor",
+        "mcz_local",
+        f"{config_entry.entry_id}_brazier",
+        config_entry=config_entry,
+    )
+    await _setup(hass, config_entry)
+    assert hass.states.get("sensor.mcz_maestro_brazier").state == "closing"
+    assert entity_registry.async_get(old.entity_id) is None
+
+
+async def test_brazier_not_present(
+    hass: HomeAssistant,
+    fake_stove: tuple[FakeStove, int],
+    config_entry: MockConfigEntry,
+) -> None:
+    """255 means no motorised brazier: no entity, no false cleaning warning."""
+    stove, _ = fake_stove
+    stove.info = info_frame(i16=0xFF)
+    await _setup(hass, config_entry)
+    assert hass.states.get("sensor.mcz_maestro_brazier") is None

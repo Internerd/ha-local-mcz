@@ -16,7 +16,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .coordinator import MczConfigEntry, MczCoordinator, StoveData
 from .entity import MczEntity
-from .protocol import INFO_BRAZIER, INFO_IGNITER, is_alarm
+from .protocol import INFO_IGNITER, is_alarm
 
 PARALLEL_UPDATES = 0
 
@@ -44,12 +44,6 @@ BINARY_SENSORS: tuple[MczBinarySensorDescription, ...] = (
         value_fn=lambda data: (
             None if data.info.state is None else is_alarm(data.info.state)
         ),
-    ),
-    MczBinarySensorDescription(
-        key="brazier",
-        translation_key="brazier",
-        device_class=BinarySensorDeviceClass.PROBLEM,
-        value_fn=_flag(INFO_BRAZIER),
     ),
     MczBinarySensorDescription(
         key="igniter",

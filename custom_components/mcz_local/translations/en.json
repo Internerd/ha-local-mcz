@@ -53,9 +53,6 @@
       "alarm": {
         "name": "Alarm"
       },
-      "brazier": {
-        "name": "Brazier needs cleaning"
-      },
       "igniter": {
         "name": "Igniter"
       }
@@ -233,6 +230,14 @@
       },
       "room_temperature": {
         "name": "Room temperature"
+      },
+      "brazier": {
+        "name": "Brazier",
+        "state": {
+          "ok": "OK",
+          "closing": "Motor closing",
+          "opening": "Motor opening"
+        }
       },
       "exhaust_temperature": {
         "name": "Exhaust temperature"

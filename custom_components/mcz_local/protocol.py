@@ -199,6 +199,10 @@ ADAPTIVE_MODE_KEYS = ["manual", "dynamic", "overnight", "comfort", "power"]
 ADAPTIVE_MODE_OFFSET = 10
 THREE_WAY_VALVE_KEYS = ["heating", "sanitary"]
 
+# RecuperoInfo[16]: motorised brazier. 255 = stove has none.
+BRAZIER_NOT_PRESENT = 0xFF
+BRAZIER_KEYS: dict[int, str] = {0: "ok", 100: "closing", 101: "opening"}
+
 
 def _firmware(value: str | None) -> tuple[int, int, int] | None:
     """Decode a 3-byte hex version such as ``010b01`` into (1, 11, 1)."""
@@ -464,6 +468,11 @@ def is_heating(state: int | None) -> bool:
             STATE_COOLING,
         )
     )
+
+
+def brazier_key(value: int | None) -> str | None:
+    """Map RecuperoInfo[16] to ok / closing / opening."""
+    return BRAZIER_KEYS.get(value) if value is not None else None
 
 
 def adaptive_mode_value(key: str) -> int:

@@ -19,8 +19,8 @@ your LAN. It needs no cloud account and no internet connection.
 | Select | Front fan and ducted fans 1/2 (off, 1–5, auto), only for fans the stove reports as installed; adaptive mode (manual, dynamic, overnight, comfort, power), if the stove supports it |
 | Switch | Auto mode, eco stop, silent mode, chrono (schedule) on/off, summer mode, antifreeze, pellet sensor, sounds |
 | Button | Reset an alarm, set the stove clock to Home Assistant's time |
-| Sensor | Stove state (including alarm codes), last alarm and when it happened, room / exhaust / board temperature, exhaust fan and auger speed, operating hours (total and per power level), ignitions, minutes until shutdown, hours until service, wireless probes 1–3 (disabled by default) |
-| Binary sensor | Alarm, brazier needs cleaning, igniter |
+| Sensor | Stove state (including alarm codes), brazier motor (only stoves with a motorised brazier), last alarm and when it happened, room / exhaust / board temperature, exhaust fan and auger speed, operating hours (total and per power level), ignitions, minutes until shutdown, hours until service, wireless probes 1–3 (disabled by default) |
+| Binary sensor | Alarm, igniter |
 | Hydro models | Buffer, water, hot water tank and return temperatures, pump, 3-way valve |
 
 The device page shows the serial number, MAC address and firmware of the stove.

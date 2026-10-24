@@ -53,9 +53,6 @@
       "alarm": {
         "name": "Alarm"
       },
-      "brazier": {
-        "name": "Brennschale reinigen"
-      },
       "igniter": {
         "name": "Zündkerze"
       }
@@ -233,6 +230,14 @@
       },
       "room_temperature": {
         "name": "Raumtemperatur"
+      },
+      "brazier": {
+        "name": "Brennschale",
+        "state": {
+          "ok": "OK",
+          "closing": "Motor schließt",
+          "opening": "Motor öffnet"
+        }
       },
       "exhaust_temperature": {
         "name": "Abgastemperatur"
